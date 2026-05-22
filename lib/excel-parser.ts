@@ -256,7 +256,7 @@ function parseProjectSheet(
     ? (rows[subHeaderRowIdx] as unknown[])
     : []
 
-  // INGRESOS columns
+  // INGRESOS columns (defaults; refined by sub-header scan below)
   let incMontoCol = ingresosCol + 1
   let incEstDateCol = ingresosCol + 2
   let incRealDateCol = ingresosCol + 3
@@ -283,88 +283,140 @@ function parseProjectSheet(
     }
   }
 
+  // ── Resolve actual description columns ────────────────────────────────────
+  //
+  // In ALL known project sheets, the "INGRESOS" and "EGRESOS" section labels
+  // are placed in the AMOUNT column (not the description column). The actual
+  // description text (EP label / expense name) is ONE column to the LEFT.
+  //
+  //  col 1: EP description   ← incDescCol
+  //  col 2: INGRESOS / MONTO ← ingresosCol = incMontoCol
+  //  col 3: FECHA ESTIMATIVA
+  //  col 4: FECHA REAL
+  //  col 5: EGRESOS desc     ← expDescCol
+  //  col 6: EGRESOS / MONTO  ← egresosCol = expNetCol (or MONTO NETO for 210+)
+  //  col 7: CON IMPUESTO     ← expWithTaxCol (new structure only)
+
+  // INGRESOS description column
+  let incDescCol = ingresosCol
+  if (incMontoCol === ingresosCol && ingresosCol > 0) {
+    incDescCol = ingresosCol - 1
+  }
+
+  // EGRESOS description and net columns
+  if (egresosCol > 0 && egresosCol < subHeader.length) {
+    const egSubHdr = toStr(subHeader[egresosCol]).toUpperCase()
+    if (egSubHdr.includes('MONTO')) {
+      // EGRESOS header sits on the amount column; description is one to the left
+      expDescCol = egresosCol - 1
+      if (!isNewStructure) {
+        // Old structure: net amount IS the egresosCol (plain "MONTO")
+        expNetCol = egresosCol
+      }
+      // New structure: expNetCol was already set to egresosCol by the scan above ✓
+    }
+  }
+
   // ── 5. Parse data rows (EPs + Expenses simultaneously) ──────────────────
   const dataStart = ingresosRow + 2
 
+  // Flags to stop collecting once each section's data ends
+  let ingresosFinished = false
+  let egresosFinished = false
+
   for (let i = dataStart; i < rows.length; i++) {
+    // Exit early when both sides are done
+    if (ingresosFinished && egresosFinished) break
+
     const row = rows[i] as unknown[]
 
     // ── INGRESOS side ─────────────────────────────────────────────────────
-    const incDesc = toStr(row[ingresosCol] ?? row[incMontoCol - 1] ?? row[1])
+    if (!ingresosFinished) {
+      const incDesc = toStr(row[incDescCol])
 
-    if (incDesc) {
-      const descLower = incDesc.toLowerCase()
+      if (incDesc) {
+        const descLower = incDesc.toLowerCase()
 
-      if (descLower.includes('total') && descLower.includes('fecha')) {
-        // "Total a la fecha" — extract collected amount
-        result.totalCollected = firstNum(row, incMontoCol)
+        // Planning/observation section markers — EP data is over
+        if (descLower.includes('observaci')) {
+          // Also try to extract any inline observation text
+          for (let col = incDescCol + 1; col < row.length; col++) {
+            const obs = toStr(row[col])
+            if (obs && !obs.toLowerCase().includes('observaci')) {
+              result.observations = obs
+              break
+            }
+          }
+          ingresosFinished = true
+        } else if (descLower.includes('total') && descLower.includes('fecha')) {
+          // "Total a la fecha" — extract collected amount
+          result.totalCollected = firstNum(row, incMontoCol)
 
-        // Scan next ~6 rows for Pendiente / Utilidad / Margen / Observaciones
-        for (let k = i + 1; k < Math.min(i + 10, rows.length); k++) {
-          const nr = rows[k] as unknown[]
-          const nd = toStr(nr[ingresosCol] ?? nr[1]).toLowerCase()
-          if (nd.includes('pendiente')) {
-            result.pending = firstNum(nr, incMontoCol)
-          } else if (nd.includes('utilidad')) {
-            result.utility = firstNum(nr, incMontoCol)
-          } else if (nd.includes('margen') || nd.includes('margin')) {
-            const m = firstNum(nr, incMontoCol)
-            // Margin can be stored as 0-1 fraction or as percent integer
-            if (m !== null) result.margin = m > 1 ? m / 100 : m
-          } else if (nd.includes('observaci')) {
-            // Observations: take remainder of row or next non-empty cell
-            for (let col = 1; col < nr.length; col++) {
-              const obs = toStr(nr[col])
-              if (obs && !obs.toLowerCase().includes('observaci')) {
-                result.observations = obs
-                break
+          // Scan next ~8 rows for Pendiente / Utilidad / Margen / Observaciones
+          for (let k = i + 1; k < Math.min(i + 10, rows.length); k++) {
+            const nr = rows[k] as unknown[]
+            const nd = toStr(nr[incDescCol]).toLowerCase()
+            if (nd.includes('pendiente')) {
+              result.pending = firstNum(nr, incMontoCol)
+            } else if (nd.includes('utilidad')) {
+              result.utility = firstNum(nr, incMontoCol)
+            } else if (nd.includes('margen') || nd.includes('margin')) {
+              const m = firstNum(nr, incMontoCol)
+              // Margin can be stored as 0-1 fraction or as percent integer
+              if (m !== null) result.margin = m > 1 ? m / 100 : m
+            } else if (nd.includes('observaci')) {
+              // Observations: scan right of the label for the first non-label value
+              for (let col = incDescCol + 1; col < nr.length; col++) {
+                const obs = toStr(nr[col])
+                if (obs && !obs.toLowerCase().includes('observaci')) {
+                  result.observations = obs
+                  break
+                }
               }
             }
           }
-        }
-        // Don't break — still need to process egresos in same rows above
-      } else if (
-        !descLower.includes('monto') &&
-        !descLower.includes('ingreso') &&
-        !descLower.includes('estimat') &&
-        !descLower.includes('pendiente') &&
-        !descLower.includes('utilidad') &&
-        !descLower.includes('margen') &&
-        !descLower.includes('observaci')
-      ) {
-        const amount = toNum(row[incMontoCol])
-        const estDate = toDate(row[incEstDateCol])
-        const realDate = toDate(row[incRealDateCol])
+          ingresosFinished = true
+        } else if (
+          !descLower.includes('monto') &&
+          !descLower.includes('ingreso') &&
+          !descLower.includes('estimat') &&
+          !descLower.includes('pendiente') &&
+          !descLower.includes('utilidad') &&
+          !descLower.includes('margen')
+        ) {
+          const amount = toNum(row[incMontoCol])
+          const estDate = toDate(row[incEstDateCol])
+          const realDate = toDate(row[incRealDateCol])
 
-        if (amount !== null || /ep|n[°o]|estado|bh/i.test(incDesc)) {
-          const ep: EP = {
-            label: incDesc,
-            amount,
-            estimatedDate: estDate,
-            realDate,
-            isPaid: !!realDate,
+          if (amount !== null || /ep|n[°o]|estado|bh|anticipo/i.test(incDesc)) {
+            const ep: EP = {
+              label: incDesc,
+              amount,
+              estimatedDate: estDate,
+              realDate,
+              isPaid: !!realDate,
+            }
+            result.eps.push(ep)
           }
-          result.eps.push(ep)
         }
       }
     }
 
     // ── EGRESOS side ──────────────────────────────────────────────────────
-    if (egresosCol >= 0) {
+    if (!egresosFinished && egresosCol >= 0) {
       const expDesc = toStr(row[expDescCol])
       if (expDesc) {
         const expDescLower = expDesc.toLowerCase()
 
-        // Stop markers for egresos
+        // Stop markers — any summary/total row signals end of expense data
         if (
-          expDescLower.includes('total egreso') ||
-          expDescLower.includes('total neto') ||
+          expDescLower.startsWith('total') ||   // "Total a la fecha", "TOTAL EGRESOS", "TOTAL NETO…"
           expDescLower.includes('margen') ||
           expDescLower.includes('costo-venta') ||
-          expDescLower.includes('costo venta')
+          expDescLower.includes('costo venta') ||
+          expDescLower.includes('para cursar')  // planning notes, not expenses
         ) {
-          // New-structure (210+) totals — we can also extract them here
-          // but we already get totals from the ingresos side scan above
+          egresosFinished = true
           continue
         }
 

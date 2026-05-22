@@ -20,8 +20,8 @@
 
   /* Text hierarchy */
   --color-primary:   #F0EDE8;
-  --color-secondary: #A8B8D0;
-  --color-muted:     #5A7090;
+  --color-secondary: #8A9BB8;   /* spec "text muted" — metadata, labels */
+  --color-muted:     #5A7090;   /* disabled, placeholder */
 
   /* Semantic */
   --color-success:   #3D8B5E;
