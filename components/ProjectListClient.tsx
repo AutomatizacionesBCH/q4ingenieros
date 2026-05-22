@@ -9,18 +9,19 @@ import type { ProjectStats } from '@/types/project'
 
 // ─── Palette constants ────────────────────────────────────────────────────────
 const C = {
-  canvas:   '#0F1A2E',
-  surface:  '#162138',
-  card:     '#1D2D47',
-  cardHov:  '#243558',
-  orange:   '#E5501E',
-  primary:  '#F0EDE8',
-  secondary:'#8A9BB8',
-  muted:    '#5A7090',
-  success:  '#3D8B5E',
-  warning:  '#D4A017',
-  border:   'rgba(255,255,255,0.08)',
-  borderSt: 'rgba(255,255,255,0.13)',
+  canvas:    '#0F1A2E',
+  surface:   '#162138',
+  card:      '#1D2D47',
+  cardHov:   '#243558',
+  orange:    '#E5501E',
+  primary:   '#F0EDE8',
+  secondary: '#8A9BB8',
+  muted:     '#5A7090',
+  success:   '#3D8B5E',
+  warning:   '#D4A017',
+  danger:    '#C0392B',
+  border:    'rgba(255,255,255,0.08)',
+  borderSt:  'rgba(255,255,255,0.13)',
 } as const
 
 // ─── EP Tracker Compact ───────────────────────────────────────────────────────
@@ -38,20 +39,28 @@ function EPTrackerCompact({ eps }: { eps: EpSlim[] }) {
   }
 
   return (
-    <div className="flex items-center gap-1 min-w-0">
-      <span className="text-[10px] shrink-0 mr-0.5" style={{ color: C.muted }}>
+    <div className="flex items-center gap-1.5 min-w-0 max-w-[200px]">
+      <span
+        className="text-[10px] shrink-0"
+        style={{ color: C.muted, letterSpacing: '0.04em' }}
+      >
         EPs
       </span>
-      <div className="flex items-center">
+      <div className="flex items-center shrink-0">
         {visible.map((ep, i) => {
-          const isPaid = ep.isPaid
+          const isPaid   = ep.isPaid
           const hasMonto = ep.amount !== null && ep.amount > 0
-          const dotColor = isPaid ? C.success : hasMonto ? C.orange : 'transparent'
-          const dotBorder = hasMonto ? 'none' : `1.5px solid ${C.secondary}`
-          const tooltip = [
+          // Paid: filled green | Pending w/ amount: filled orange | No amount: outline
+          const dotBg     = isPaid ? C.success : hasMonto ? C.orange : 'transparent'
+          const dotBorder = !hasMonto ? `1.5px solid ${C.secondary}` : 'none'
+          const tooltip   = [
             ep.label,
-            ep.amount ? formatCLP(ep.amount) : null,
-            ep.realDate ? `Recibido ${formatDate(ep.realDate)}` : ep.estimatedDate ? `Est. ${formatDate(ep.estimatedDate)}` : null,
+            ep.amount != null ? formatCLP(ep.amount) : null,
+            ep.realDate
+              ? `Recibido ${formatDate(ep.realDate)}`
+              : ep.estimatedDate
+              ? `Est. ${formatDate(ep.estimatedDate)}`
+              : null,
           ]
             .filter(Boolean)
             .join(' · ')
@@ -60,33 +69,36 @@ function EPTrackerCompact({ eps }: { eps: EpSlim[] }) {
             <span key={i} className="flex items-center">
               {i > 0 && (
                 <span
+                  aria-hidden
                   style={{
                     display: 'inline-block',
-                    width: 10,
+                    width: 8,
                     height: 1,
                     background: C.muted,
-                    opacity: 0.4,
+                    opacity: 0.35,
+                    flexShrink: 0,
                   }}
                 />
               )}
               <span
                 title={tooltip}
+                aria-label={tooltip}
                 style={{
-                  display: 'inline-block',
-                  width: 10,
-                  height: 10,
+                  display:      'inline-block',
+                  width:        10,
+                  height:       10,
                   borderRadius: '50%',
-                  background: dotColor,
-                  border: dotBorder,
-                  flexShrink: 0,
-                  cursor: 'default',
+                  background:   dotBg,
+                  border:       dotBorder,
+                  flexShrink:   0,
+                  cursor:       'default',
                 }}
               />
             </span>
           )
         })}
         {hasMore && (
-          <span className="text-[10px] ml-0.5" style={{ color: C.muted }}>
+          <span className="text-[10px] ml-1" style={{ color: C.muted }}>
             …
           </span>
         )}
@@ -139,7 +151,7 @@ function ProjectCard({
       className="relative rounded-lg cursor-pointer transition-colors duration-100 focus:outline-none focus-visible:ring-1"
       style={{
         background: hovered ? C.cardHov : C.card,
-        borderLeft: `2px solid ${borderColor}`,
+        borderLeft: `3px solid ${borderColor}`,
         padding: '10px 12px',
       }}
     >
@@ -171,14 +183,16 @@ function ProjectCard({
       </p>
 
       {/* Row 3: EP tracker + pending amount */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-2">
         <EPTrackerCompact eps={project.eps} />
-        <span
-          className="text-xs tabular font-semibold shrink-0"
-          style={{ color: hasPending ? C.orange : C.muted }}
-        >
-          {project.pending !== null ? formatCLP(project.pending) : '—'}
-        </span>
+        {project.pending !== null && (
+          <span
+            className="text-xs tabular font-semibold shrink-0 ml-auto"
+            style={{ color: hasPending ? C.orange : C.muted }}
+          >
+            {formatCLP(project.pending)}
+          </span>
+        )}
       </div>
     </article>
   )
