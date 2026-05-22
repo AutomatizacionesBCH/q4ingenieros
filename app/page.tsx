@@ -1,65 +1,141 @@
-import Image from "next/image";
+/**
+ * app/page.tsx — Phase 1 validation page
+ *
+ * Server Component that calls the validate endpoint and displays
+ * parsed stats vs. expected control figures from CLAUDE.md §6.
+ */
+import Image from 'next/image'
+import type { ValidationResult } from '@/types/project'
 
-export default function Home() {
+async function getValidation(): Promise<ValidationResult | null> {
+  try {
+    // Server-side fetch — absolute URL required in App Router server components
+    const base = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000'
+    const res = await fetch(`${base}/api/validate`, { cache: 'no-store' })
+    return res.json()
+  } catch {
+    return null
+  }
+}
+
+const LABELS: Record<string, string> = {
+  total:     'Total proyectos',
+  active:    'Activos',
+  finalized: 'Finalizados',
+  public:    'Públicos',
+  private:   'Privados',
+  noScope:   'Sin ámbito',
+}
+
+export default async function HomePage() {
+  const validation = await getValidation()
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
+    <div className="min-h-screen bg-canvas flex flex-col items-center justify-center p-8 gap-8">
+      {/* Logo */}
+      <div className="flex items-center gap-4">
         <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
+          src="/logo.jpeg"
+          alt="Q4 Ingenieros"
+          width={80}
+          height={80}
+          className="rounded-lg"
           priority
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+        <div>
+          <h1 className="text-2xl font-bold text-primary tracking-tight">
+            Q4 Ingenieros
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+          <p className="text-secondary text-sm">Dashboard — Fase 1 · Validación del Parser</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
+
+      {/* Validation card */}
+      <div
+        className="w-full max-w-lg rounded-xl border p-6 space-y-5"
+        style={{
+          background: '#162138',
+          borderColor: 'rgba(255,255,255,0.08)',
+        }}
+      >
+        {validation === null ? (
+          <div className="text-center text-danger py-8">
+            Error al conectar con el parser. ¿Está corriendo el servidor?
+          </div>
+        ) : (
+          <>
+            {/* Status badge */}
+            <div className="flex items-center gap-3">
+              <span
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium"
+                style={{
+                  background: validation.ok ? 'rgba(61,139,94,0.15)' : 'rgba(192,57,43,0.15)',
+                  color: validation.ok ? '#3D8B5E' : '#C0392B',
+                  border: `1px solid ${validation.ok ? 'rgba(61,139,94,0.3)' : 'rgba(192,57,43,0.3)'}`,
+                }}
+              >
+                <span>{validation.ok ? '✓' : '✗'}</span>
+                {validation.ok ? 'Parseo validado — cifras correctas' : 'Desajuste en cifras de control'}
+              </span>
+            </div>
+
+            {/* Stats table */}
+            <div className="space-y-1">
+              {Object.entries(LABELS).map(([key, label]) => {
+                const actual = validation.stats[key as keyof typeof validation.stats]
+                const expected = validation.expected[key as keyof typeof validation.expected]
+                const match = actual === expected
+                return (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between py-2 px-3 rounded-lg text-sm"
+                    style={{ background: 'rgba(255,255,255,0.03)' }}
+                  >
+                    <span className="text-secondary">{label}</span>
+                    <div className="flex items-center gap-3 tabular">
+                      <span
+                        className="font-semibold"
+                        style={{ color: match ? '#F0EDE8' : '#C0392B' }}
+                      >
+                        {actual}
+                      </span>
+                      <span className="text-muted text-xs">
+                        / {expected} esperado
+                      </span>
+                      <span style={{ color: match ? '#3D8B5E' : '#C0392B' }}>
+                        {match ? '✓' : '✗'}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Mismatches */}
+            {validation.mismatches.length > 0 && (
+              <div
+                className="rounded-lg p-3 text-xs space-y-1"
+                style={{ background: 'rgba(192,57,43,0.08)', border: '1px solid rgba(192,57,43,0.2)' }}
+              >
+                <p className="font-medium text-danger mb-1">Desajustes:</p>
+                {validation.mismatches.map((m, i) => (
+                  <p key={i} className="text-danger/80 font-mono">{m}</p>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* API links */}
+      <div className="flex gap-4 text-xs text-muted">
+        <a href="/api/validate" target="_blank" className="hover:text-secondary transition-colors">
+          /api/validate ↗
+        </a>
+        <a href="/api/projects" target="_blank" className="hover:text-secondary transition-colors">
+          /api/projects ↗
+        </a>
+      </div>
     </div>
-  );
+  )
 }
