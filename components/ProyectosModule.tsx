@@ -332,10 +332,13 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 const PROJ_EDIT_KEY = 'proj_edit_v1'
 interface ProjEdits {
-  budget?:    number
-  collected?: number
-  pending?:   number
-  egresos?:   number
+  budget?:       number
+  collected?:    number
+  pending?:      number
+  egresos?:      number
+  eps?:          Record<number, { label?: string; amount?: number; estimatedDate?: string; realDate?: string }>
+  expenses?:     Record<number, { description?: string; amountNet?: number; amountWithTax?: number }>
+  observations?: string
 }
 function loadProjEdits(id: number): ProjEdits {
   try {
@@ -415,6 +418,55 @@ function EditableKpi({
   )
 }
 
+// ─── Active edit types + helpers ──────────────────────────────────────────────
+
+type ActiveEdit =
+  | { kind: 'kpi';     field: EditField }
+  | { kind: 'ep';      idx: number; col: 'label' | 'amount' | 'estDate' | 'realDate' }
+  | { kind: 'expense'; idx: number; col: 'description' | 'amountNet' | 'amountWithTax' }
+  | { kind: 'obs' }
+  | null
+
+function dateToStr(d: string | Date | null | undefined): string {
+  if (!d) return ''
+  if (typeof d === 'string') return d.slice(0, 10)
+  return (d as Date).toISOString().slice(0, 10)
+}
+
+function EditableCell({
+  value, isEditing, inputVal, onStart, onChange, onCommit, onCancel,
+  align = 'left', color,
+}: {
+  value: string; isEditing: boolean; inputVal: string
+  onStart: () => void; onChange: (v: string) => void
+  onCommit: () => void; onCancel: () => void
+  align?: 'left' | 'right'; color?: string
+}) {
+  return (
+    <td
+      onClick={() => { if (!isEditing) onStart() }}
+      style={{ ...TD, textAlign: align, cursor: 'pointer', color: color ?? C.textPrimary }}
+    >
+      {isEditing ? (
+        <input
+          autoFocus
+          value={inputVal}
+          onChange={e => onChange(e.target.value)}
+          onBlur={onCommit}
+          onKeyDown={e => { if (e.key === 'Enter') onCommit(); if (e.key === 'Escape') onCancel() }}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            border: `1px solid ${C.orange}`, borderRadius: 4,
+            padding: '3px 6px', fontSize: 12, outline: 'none', background: 'white',
+          }}
+        />
+      ) : (
+        <span style={{ display: 'block', minHeight: 20 }}>{value || '—'}</span>
+      )}
+    </td>
+  )
+}
+
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
 function Skeleton() {
@@ -455,12 +507,12 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
   const hasImputaciones  = detail.expenses.some(e => e.amountWithTax != null)
 
   const [edits,    setEdits]    = useState<ProjEdits>(() => loadProjEdits(detail.id))
-  const [editing,  setEditing]  = useState<EditField | null>(null)
+  const [active,   setActive]   = useState<ActiveEdit>(null)
   const [inputVal, setInputVal] = useState('')
 
   useEffect(() => {
     setEdits(loadProjEdits(detail.id))
-    setEditing(null)
+    setActive(null)
   }, [detail.id])
 
   function persist(next: ProjEdits) {
@@ -468,50 +520,106 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
     saveProjEdits(detail.id, next)
   }
 
-  function startEdit(field: EditField, current: number | null) {
-    setEditing(field)
-    setInputVal(current != null ? String(Math.round(current)) : '')
+  function startEdit(ae: NonNullable<ActiveEdit>, initVal: string) {
+    setActive(ae)
+    setInputVal(initVal)
   }
 
+  // Is this particular edit slot currently active?
+  const isAct = (ae: NonNullable<ActiveEdit>): boolean => {
+    if (!active) return false
+    if (ae.kind === 'kpi')     return active.kind === 'kpi'     && active.field === ae.field
+    if (ae.kind === 'ep')      return active.kind === 'ep'      && active.idx === ae.idx && active.col === ae.col
+    if (ae.kind === 'expense') return active.kind === 'expense' && active.idx === ae.idx && active.col === ae.col
+    return active.kind === 'obs'
+  }
+
+  // Props spread for EditableCell
+  const ec = (ae: NonNullable<ActiveEdit>, initVal: string) => ({
+    isEditing: isAct(ae),
+    inputVal:  isAct(ae) ? inputVal : '',
+    onStart:   () => startEdit(ae, initVal),
+    onChange:  setInputVal,
+    onCommit:  commitEdit,
+    onCancel:  () => setActive(null),
+  })
+
   function commitEdit() {
-    if (!editing) return
-    const n = Number(inputVal.replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, ''))
-    if (!isNaN(n)) persist({ ...edits, [editing]: n })
-    setEditing(null)
+    if (!active) return
+    const toNum = (s: string) => Number(s.replace(/[^0-9]/g, ''))
+
+    if (active.kind === 'kpi') {
+      const n = Number(inputVal.replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, ''))
+      if (!isNaN(n)) persist({ ...edits, [active.field]: n })
+
+    } else if (active.kind === 'ep') {
+      const epEdits = { ...(edits.eps ?? {}) }
+      const cur = { ...(epEdits[active.idx] ?? {}) }
+      if      (active.col === 'amount')   { const n = toNum(inputVal); if (!isNaN(n)) cur.amount = n }
+      else if (active.col === 'estDate')  { cur.estimatedDate = inputVal || undefined }
+      else if (active.col === 'realDate') { cur.realDate      = inputVal || undefined }
+      else                                { cur.label         = inputVal || undefined }
+      epEdits[active.idx] = cur
+      persist({ ...edits, eps: epEdits })
+
+    } else if (active.kind === 'expense') {
+      const expEdits = { ...(edits.expenses ?? {}) }
+      const cur = { ...(expEdits[active.idx] ?? {}) }
+      if      (active.col === 'description')   { cur.description  = inputVal || undefined }
+      else if (active.col === 'amountNet')     { const n = toNum(inputVal); if (!isNaN(n)) cur.amountNet = n }
+      else                                     { const n = toNum(inputVal); if (!isNaN(n)) cur.amountWithTax = n }
+      expEdits[active.idx] = cur
+      persist({ ...edits, expenses: expEdits })
+
+    } else if (active.kind === 'obs') {
+      persist({ ...edits, observations: inputVal })
+    }
+    setActive(null)
   }
 
   function resetField(field: EditField) {
-    const next = { ...edits }
-    delete next[field]
-    persist(next)
+    const next = { ...edits }; delete next[field]; persist(next)
   }
 
+  // Resolved values (edit override ?? Excel original)
   const budget    = edits.budget    ?? detail.budget?.net    ?? null
   const collected = edits.collected ?? detail.totalCollected ?? null
   const pending   = edits.pending   ?? detail.pending        ?? null
   const egresos   = edits.egresos   ?? (totalEgresosCalc || null)
 
+  function getEp(ep: EP, idx: number) {
+    const ov = edits.eps?.[idx] ?? {}
+    return {
+      label:    ov.label         ?? ep.label         ?? `EP ${idx + 1}`,
+      amount:   ov.amount        ?? ep.amount        ?? null,
+      estDate:  ov.estimatedDate ?? ep.estimatedDate ?? null,
+      realDate: ov.realDate      ?? ep.realDate      ?? null,
+    }
+  }
+
+  const observations = edits.observations !== undefined ? edits.observations : (detail.observations ?? '')
+
   // Analysis
   const totalNeto  = budget != null && egresos != null ? budget - egresos : null
-  const margen     = budget != null && budget > 0 && totalNeto  != null ? totalNeto  / budget : null
-  const costoVenta = budget != null && budget > 0 && egresos    != null ? egresos    / budget : null
+  const margen     = budget != null && budget > 0 && totalNeto != null ? totalNeto / budget : null
+  const costoVenta = budget != null && budget > 0 && egresos   != null ? egresos   / budget : null
 
   const kpiProps = (field: EditField, value: number | null, color: string, label: string) => ({
     label, value, color,
-    isEditing:     editing === field,
+    isEditing:     active?.kind === 'kpi' && active.field === field,
     isOverridden:  edits[field] != null,
-    inputVal:      editing === field ? inputVal : '',
-    onStartEdit:   (v: number | null) => startEdit(field, v),
+    inputVal:      active?.kind === 'kpi' && active.field === field ? inputVal : '',
+    onStartEdit:   (v: number | null) => startEdit({ kind: 'kpi', field }, v != null ? String(Math.round(v)) : ''),
     onInputChange: setInputVal,
     onCommit:      commitEdit,
-    onCancel:      () => setEditing(null),
+    onCancel:      () => setActive(null),
     onReset:       () => resetField(field),
   })
 
   return (
     <div style={{ padding: '28px 32px 40px', maxWidth: 900 }}>
 
-      {/* Header — no status badge */}
+      {/* Header */}
       <div style={{ paddingBottom: 20, marginBottom: 24, borderBottom: `1px solid ${C.border}` }}>
         <div style={{ fontFamily: 'monospace', fontSize: 12, color: C.textMuted, marginBottom: 6 }}>
           #{detail.id}
@@ -535,17 +643,62 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
         <EditableKpi {...kpiProps('egresos',   egresos,   C.danger,      'Egresos')} />
       </div>
 
-      {/* EPs */}
+      {/* EPs — editable table */}
       <div style={{ marginBottom: 28 }}>
         <SectionTitle>Estados de Pago ({detail.eps.length})</SectionTitle>
-        <EPTrackerExpanded eps={detail.eps} />
+        {detail.eps.length === 0 ? (
+          <p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Sin estados de pago registrados.</p>
+        ) : (
+          <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
+              <thead>
+                <tr style={{ background: C.listBg }}>
+                  <th style={TH}>Estado de Pago</th>
+                  <th style={{ ...TH, textAlign: 'right' }}>Monto</th>
+                  <th style={TH}>Fecha Est.</th>
+                  <th style={TH}>Fecha Real</th>
+                  <th style={{ ...TH, textAlign: 'center' }}>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.eps.map((ep, i) => {
+                  const d    = getEp(ep, i)
+                  const paid = !!d.realDate
+                  return (
+                    <tr key={i} style={{ borderTop: i > 0 ? `1px solid ${C.border}` : 'none' }}>
+                      <EditableCell value={d.label} color={C.textPrimary}
+                        {...ec({ kind: 'ep', idx: i, col: 'label'    }, d.label)} />
+                      <EditableCell value={d.amount != null ? fmtCLP(d.amount) : ''} align="right" color={C.success}
+                        {...ec({ kind: 'ep', idx: i, col: 'amount'   }, d.amount != null ? String(Math.round(d.amount)) : '')} />
+                      <EditableCell value={fmtDate(d.estDate)} color={C.textSec}
+                        {...ec({ kind: 'ep', idx: i, col: 'estDate'  }, dateToStr(d.estDate))} />
+                      <EditableCell value={fmtDate(d.realDate)} color={paid ? C.success : C.textMuted}
+                        {...ec({ kind: 'ep', idx: i, col: 'realDate' }, dateToStr(d.realDate))} />
+                      <td style={{ ...TD, textAlign: 'center' }}>
+                        <span style={{
+                          display: 'inline-flex', padding: '2px 8px', borderRadius: 20,
+                          fontSize: 10, fontWeight: 700,
+                          color: paid ? C.success : C.orange,
+                          background: paid ? C.successBg : C.orangeFaint,
+                          border: `1px solid ${paid ? C.successBorder : C.orangeBorder}`,
+                        }}>
+                          {paid ? 'Pagado' : 'Pendiente'}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Egresos table */}
+      {/* Egresos — editable table */}
       {detail.expenses.length > 0 && (
         <div style={{ marginBottom: 28 }}>
           <SectionTitle>Egresos ({detail.expenses.length})</SectionTitle>
-          <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
+          <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: C.listBg }}>
@@ -555,19 +708,24 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
                 </tr>
               </thead>
               <tbody>
-                {detail.expenses.map((e, i) => (
-                  <tr key={i} style={{ borderTop: `1px solid ${C.border}` }}>
-                    <td style={TD}>{e.description || '—'}</td>
-                    <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: C.danger }}>
-                      {fmtCLP(e.amountNet)}
-                    </td>
-                    {hasImputaciones && (
-                      <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: C.textSec }}>
-                        {e.amountWithTax != null ? fmtCLP(e.amountWithTax) : '—'}
-                      </td>
-                    )}
-                  </tr>
-                ))}
+                {detail.expenses.map((e, i) => {
+                  const ov  = edits.expenses?.[i] ?? {}
+                  const desc  = ov.description  ?? e.description  ?? ''
+                  const net   = ov.amountNet    ?? e.amountNet    ?? null
+                  const gross = ov.amountWithTax ?? e.amountWithTax ?? null
+                  return (
+                    <tr key={i} style={{ borderTop: `1px solid ${C.border}` }}>
+                      <EditableCell value={String(desc)}
+                        {...ec({ kind: 'expense', idx: i, col: 'description'   }, String(desc))} />
+                      <EditableCell value={fmtCLP(net)} align="right" color={C.danger}
+                        {...ec({ kind: 'expense', idx: i, col: 'amountNet'     }, net != null ? String(Math.round(net)) : '')} />
+                      {hasImputaciones && (
+                        <EditableCell value={gross != null ? fmtCLP(gross) : ''} align="right" color={C.textSec}
+                          {...ec({ kind: 'expense', idx: i, col: 'amountWithTax' }, gross != null ? String(Math.round(gross)) : '')} />
+                      )}
+                    </tr>
+                  )
+                })}
               </tbody>
               <tfoot>
                 <tr style={{ background: C.listBg, borderTop: `2px solid ${C.border}` }}>
@@ -590,47 +748,14 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <tbody>
               {([
-                {
-                  label: 'Total Egresos',
-                  value: fmtCLP(egresos),
-                  color: C.danger,
-                  bold:  false,
-                },
-                {
-                  label: 'Total Neto Q4 Ingenieros',
-                  value: fmtCLP(totalNeto),
-                  color: (totalNeto ?? 0) >= 0 ? C.success : C.danger,
-                  bold:  true,
-                },
-                {
-                  label: 'Margen de Utilidad',
-                  value: margen != null ? `${(margen * 100).toFixed(1)}%` : '—',
-                  color: (margen ?? 0) >= 0 ? C.success : C.danger,
-                  bold:  true,
-                },
-                {
-                  label: 'Costo-Venta',
-                  value: costoVenta != null ? `${(costoVenta * 100).toFixed(1)}%` : '—',
-                  color: C.textSec,
-                  bold:  false,
-                },
+                { label: 'Total Egresos',            value: fmtCLP(egresos),   color: C.danger,  bold: false },
+                { label: 'Total Neto Q4 Ingenieros', value: fmtCLP(totalNeto), color: (totalNeto ?? 0) >= 0 ? C.success : C.danger, bold: true },
+                { label: 'Margen de Utilidad',       value: margen != null ? `${(margen * 100).toFixed(1)}%` : '—', color: (margen ?? 0) >= 0 ? C.success : C.danger, bold: true },
+                { label: 'Costo-Venta',              value: costoVenta != null ? `${(costoVenta * 100).toFixed(1)}%` : '—', color: C.textSec, bold: false },
               ] as { label: string; value: string; color: string; bold: boolean }[]).map((row, i) => (
-                <tr
-                  key={i}
-                  style={{
-                    borderTop: i > 0 ? `1px solid ${C.border}` : 'none',
-                    background: i % 2 === 0 ? C.listBg : C.card,
-                  }}
-                >
-                  <td style={{ ...TD, fontWeight: row.bold ? 600 : 400, color: C.textSec, width: '60%' }}>
-                    {row.label}
-                  </td>
-                  <td style={{
-                    ...TD, textAlign: 'right',
-                    fontWeight: row.bold ? 700 : 500,
-                    color: row.color,
-                    fontVariantNumeric: 'tabular-nums',
-                  }}>
+                <tr key={i} style={{ borderTop: i > 0 ? `1px solid ${C.border}` : 'none', background: i % 2 === 0 ? C.listBg : C.card }}>
+                  <td style={{ ...TD, fontWeight: row.bold ? 600 : 400, color: C.textSec, width: '60%' }}>{row.label}</td>
+                  <td style={{ ...TD, textAlign: 'right', fontWeight: row.bold ? 700 : 500, color: row.color, fontVariantNumeric: 'tabular-nums' }}>
                     {row.value}
                   </td>
                 </tr>
@@ -640,19 +765,38 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
         </div>
       </div>
 
-      {/* Observations */}
-      {detail.observations && (
-        <div>
-          <SectionTitle>Observaciones</SectionTitle>
-          <div style={{
-            fontSize: 13, color: C.textSec, lineHeight: 1.7,
-            padding: '14px 16px', borderRadius: 8,
-            background: C.warningBg, border: `1px solid ${C.warningBorder}`,
-          }}>
-            {detail.observations}
+      {/* Observations — always visible, editable */}
+      <div>
+        <SectionTitle>Observaciones</SectionTitle>
+        {active?.kind === 'obs' ? (
+          <textarea
+            autoFocus
+            value={inputVal}
+            onChange={e => setInputVal(e.target.value)}
+            onBlur={commitEdit}
+            onKeyDown={e => { if (e.key === 'Escape') setActive(null) }}
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              fontSize: 13, color: C.textSec, lineHeight: 1.7,
+              padding: '14px 16px', borderRadius: 8,
+              background: C.warningBg, border: `1px solid ${C.orange}`,
+              resize: 'vertical', minHeight: 72, outline: 'none',
+            }}
+          />
+        ) : (
+          <div
+            onClick={() => startEdit({ kind: 'obs' }, observations)}
+            style={{
+              fontSize: 13, lineHeight: 1.7, cursor: 'pointer',
+              padding: '14px 16px', borderRadius: 8,
+              color: observations ? C.textSec : C.textMuted,
+              background: C.warningBg, border: `1px solid ${C.warningBorder}`,
+            }}
+          >
+            {observations || '✎ Click para agregar observaciones...'}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
@@ -670,7 +814,6 @@ const SEL: React.CSSProperties = {
 // ─── Filter types ─────────────────────────────────────────────────────────────
 
 type StatusF  = 'todos' | 'activos' | 'finalizados'
-type GestionF = 'todos' | 'm' | 'i' | 'e'
 type AmbitoF  = 'todos' | 'Público' | 'Privado'
 
 // ─── Module ───────────────────────────────────────────────────────────────────
@@ -687,19 +830,17 @@ export function ProyectosModule({ projects, stats }: Props) {
   const [loading, setLoading]       = useState(false)
 
   const [statusF,  setStatusF]  = useState<StatusF>('todos')
-  const [gestionF, setGestionF] = useState<GestionF>('todos')
   const [ambitoF,  setAmbitoF]  = useState<AmbitoF>('todos')
 
   // Projects available in the dropdown (after external filters)
   const filtered = useMemo(() => projects.filter(p => {
-    if (statusF  === 'activos'     && p.isFinalized)       return false
-    if (statusF  === 'finalizados' && !p.isFinalized)      return false
-    if (gestionF !== 'todos' && p.managementType !== gestionF) return false
-    if (ambitoF  !== 'todos' && p.scope !== ambitoF)           return false
+    if (statusF  === 'activos'     && p.isFinalized)  return false
+    if (statusF  === 'finalizados' && !p.isFinalized) return false
+    if (ambitoF  !== 'todos' && p.scope !== ambitoF)  return false
     return true
-  }), [projects, statusF, gestionF, ambitoF])
+  }), [projects, statusF, ambitoF])
 
-  const isFiltering = statusF !== 'todos' || gestionF !== 'todos' || ambitoF !== 'todos'
+  const isFiltering = statusF !== 'todos' || ambitoF !== 'todos'
 
   const selectProject = useCallback(async (id: number) => {
     if (id === selectedId) return
@@ -764,13 +905,6 @@ export function ProyectosModule({ projects, stats }: Props) {
             <option value="todos">Estado: Todos</option>
             <option value="activos">Activos</option>
             <option value="finalizados">Finalizados</option>
-          </select>
-
-          <select value={gestionF} onChange={e => setGestionF(e.target.value as GestionF)} style={{ ...SEL, flex: isMobile ? 1 : 'none' }}>
-            <option value="todos">Gestión: Todos</option>
-            <option value="m">Memoria</option>
-            <option value="i">Ingeniería</option>
-            <option value="e">Especialidades</option>
           </select>
 
           <select value={ambitoF}  onChange={e => setAmbitoF(e.target.value as AmbitoF)}   style={{ ...SEL, flex: isMobile ? 1 : 'none' }}>
