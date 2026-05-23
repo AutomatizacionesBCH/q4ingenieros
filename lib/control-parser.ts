@@ -251,6 +251,7 @@ function parseCursado(workbook: XLSX.WorkBook): {
 
   // ── Scan for key row indices ──────────────────────────────────────────────
   let publicoNoFacturadoTotalRow   = -1  // "TOTAL  NO FACTURADO" col0
+  let proximosFacturarTotalRow     = -1  // "TOTAL NO FACTURADO PERO PROYECTABLE" col0
   let publicoFacturadoNoPagadoRow  = -1  // "TOTAL FACTURADO NO PAGADO" col0
   let privadoBoletasTotalRow       = -1  // "TOTAL BOLETAS CURSADAS" col3
   let facturadoTotalRow            = -1  // col6 = "TOTAL" (row 29)
@@ -269,6 +270,8 @@ function parseCursado(workbook: XLSX.WorkBook): {
 
     if (c0.includes('TOTAL') && c0.includes('NO FACTURADO') && !c0.includes('PROYECT') && !c0.includes('PAGADO'))
       publicoNoFacturadoTotalRow = i
+    if (c0.includes('PROYECTABLE'))
+      proximosFacturarTotalRow = i
     if (c0.includes('TOTAL FACTURADO NO PAGADO'))
       publicoFacturadoNoPagadoRow = i
     if (c3.includes('TOTAL BOLETAS'))
@@ -291,8 +294,17 @@ function parseCursado(workbook: XLSX.WorkBook): {
   }
 
   // ── Pendiente summary ─────────────────────────────────────────────────────
-  const publicoNoFacturado = publicoNoFacturadoTotalRow >= 0
+  const basePublicoNoFacturado = publicoNoFacturadoTotalRow >= 0
     ? toNum((rows[publicoNoFacturadoTotalRow] as unknown[])[1]) : null
+  // "Próximos a facturar/No proyectados" — se suma a No Facturado
+  const proximosTotal = proximosFacturarTotalRow >= 0
+    ? (toNum((rows[proximosFacturarTotalRow] as unknown[])[1]) ??
+       toNum((rows[proximosFacturarTotalRow] as unknown[])[2]))
+    : null
+  const publicoNoFacturado =
+    basePublicoNoFacturado !== null || proximosTotal !== null
+      ? (basePublicoNoFacturado ?? 0) + (proximosTotal ?? 0)
+      : null
   const publicoFacturadoNoCobrado = publicoFacturadoNoPagadoRow >= 0
     ? toNum((rows[publicoFacturadoNoPagadoRow] as unknown[])[1]) : null
   const privadoNoFacturado = publicoNoFacturadoTotalRow >= 0
@@ -336,9 +348,30 @@ function parseCursado(workbook: XLSX.WorkBook): {
     }
   }
 
-  // Facturado/No Cobrado (pub) and Boletas (priv): rows publicoNoFacturadoTotalRow+1..publicoFacturadoNoPagadoRow-1
-  if (publicoNoFacturadoTotalRow >= 0 && publicoFacturadoNoPagadoRow > publicoNoFacturadoTotalRow) {
-    for (let i = publicoNoFacturadoTotalRow + 1; i < publicoFacturadoNoPagadoRow; i++) {
+  // "Próximos a facturar/No proyectados" → tipo noFac (sumados a No Facturado)
+  if (publicoNoFacturadoTotalRow >= 0 && proximosFacturarTotalRow > publicoNoFacturadoTotalRow) {
+    for (let i = publicoNoFacturadoTotalRow + 1; i < proximosFacturarTotalRow; i++) {
+      const r = rows[i] as unknown[]
+      const pubName = toStr(r[0])
+      const pubAmt  = toNum(r[1])
+      if (pubName && pubAmt !== null && pubAmt !== 0) {
+        publicoItems.push({ project: pubName, amount: pubAmt, tipo: 'noFac' })
+      }
+      const privName = toStr(r[3])
+      const privAmt  = toNum(r[4])
+      if (privName && privAmt !== null && privAmt !== 0) {
+        privadoItems.push({ project: privName, amount: privAmt, tipo: 'noFac' })
+      }
+    }
+  }
+
+  // Facturado/No Cobrado (pub) and Boletas (priv)
+  // Empieza después de "próximos" si existe, si no después de "no facturado"
+  const facNoCobStart = proximosFacturarTotalRow >= 0
+    ? proximosFacturarTotalRow
+    : publicoNoFacturadoTotalRow
+  if (facNoCobStart >= 0 && publicoFacturadoNoPagadoRow > facNoCobStart) {
+    for (let i = facNoCobStart + 1; i < publicoFacturadoNoPagadoRow; i++) {
       const r = rows[i] as unknown[]
       const pubName = toStr(r[0])
       const pubAmt  = toNum(r[1])
