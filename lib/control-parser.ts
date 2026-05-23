@@ -16,6 +16,15 @@ export interface ProjectEntry {
   amount: number
 }
 
+export type TipoIngreso = 'Público' | 'Privado'
+
+export interface IngresoEntry {
+  project: string
+  amount: number
+  /** Auto-assigned via greedy subset-sum against Excel reference totals */
+  tipo: TipoIngreso
+}
+
 /** Summary table row — no meta, no eficiencia */
 export interface MonthSummary {
   mes: string
@@ -30,9 +39,10 @@ export interface MonthDetail {
   facturadoItems: ProjectEntry[]
   facturadoTotal: number | null
   // Box 2: Ingreso recibido
-  ingresoItems: ProjectEntry[]      // individual ingreso entries
-  ingresoPrivado: number | null     // subtotal from PRIVADOS RECIBIDOS row
-  ingresoPublico: number | null     // subtotal from PÚBLICO RECIBIDO row
+  ingresoItems: IngresoEntry[]
+  /** Excel reference totals (rows 50-51) — used for auto-assign and display */
+  ingresoPrivadoRef: number | null
+  ingresoPublicoRef: number | null
   ingresoTotal: number | null
   // Box 3: Resumen
   resumenFacturado: number | null
@@ -167,6 +177,36 @@ function parseLastUpdate(workbook: XLSX.WorkBook): string | null {
 
 // ─── CURSADO-INGRESADO sheet — pendiente + monthly detail ─────────────────────
 
+// ─── Greedy subset-sum tipo assignment ───────────────────────────────────────
+// Tries all 2^n subsets (n ≤ ~10) to find which items sum to publicoRef.
+// If an exact match is found, marks those as 'Público'. Otherwise all 'Privado'.
+function assignTipos(
+  items: ProjectEntry[],
+  publicoRef: number | null,
+): IngresoEntry[] {
+  const EPS = 2
+  if (!publicoRef || publicoRef < EPS) {
+    return items.map(it => ({ ...it, tipo: 'Privado' as const }))
+  }
+
+  const n = items.length
+  const limit = Math.min(n, 20) // safety cap for bitmask
+  for (let mask = 1; mask < (1 << limit); mask++) {
+    let sum = 0
+    for (let bit = 0; bit < limit; bit++) {
+      if (mask & (1 << bit)) sum += items[bit].amount
+    }
+    if (Math.abs(sum - publicoRef) < EPS) {
+      return items.map((it, i) => ({
+        ...it,
+        tipo: (mask & (1 << i)) ? 'Público' : 'Privado' as TipoIngreso,
+      }))
+    }
+  }
+  // No exact subset found → default all to Privado
+  return items.map(it => ({ ...it, tipo: 'Privado' as const }))
+}
+
 const MONTH_COLS = [
   { mes: 'Enero',   descCol: 6,  amountCol: 7  },
   { mes: 'Febrero', descCol: 9,  amountCol: 10 },
@@ -291,9 +331,9 @@ function parseCursado(workbook: XLSX.WorkBook): {
       }
     }
 
-    const ingresoPrivado = ingresoPrivadoRow >= 0
+    const ingresoPrivadoRef = ingresoPrivadoRow >= 0
       ? toNum((rows[ingresoPrivadoRow] as unknown[])[amountCol]) : null
-    const ingresoPublico = ingresoPublicoRow >= 0
+    const ingresoPublicoRef = ingresoPublicoRow >= 0
       ? toNum((rows[ingresoPublicoRow] as unknown[])[amountCol]) : null
     const ingresoTotal = ingresoTotalRow >= 0
       ? toNum((rows[ingresoTotalRow] as unknown[])[amountCol]) : null
@@ -302,15 +342,18 @@ function parseCursado(workbook: XLSX.WorkBook): {
     const resumenFacturado = resumenFacturadoRow >= 0
       ? toNum((rows[resumenFacturadoRow] as unknown[])[amountCol]) : null
 
+    // Auto-assign tipos using Excel reference totals
+    const ingresoItemsTyped = assignTipos(ingresoItems, ingresoPublicoRef)
+
     // Only include months with actual data
     if (facturadoTotal !== null || ingresoTotal !== null) {
       months.push({
         mes,
         facturadoItems,
         facturadoTotal,
-        ingresoItems,
-        ingresoPrivado,
-        ingresoPublico,
+        ingresoItems: ingresoItemsTyped,
+        ingresoPrivadoRef,
+        ingresoPublicoRef,
         ingresoTotal,
         resumenFacturado,
         resumenIngresoCaja,
