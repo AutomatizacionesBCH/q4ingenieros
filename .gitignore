@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Permitir archivos Excel en data/ (necesarios para producción)
+!data/*.xlsx

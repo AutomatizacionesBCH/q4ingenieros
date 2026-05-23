@@ -35,7 +35,7 @@ function getWorkbook(): XLSX.WorkBook {
 
   const filePath =
     process.env.EXCEL_PATH ??
-    path.join(process.cwd(), '..', 'Q4 INGENIEROS ACTUALIZADA.xlsx')
+    path.join(process.cwd(), 'data', 'Q4 INGENIEROS ACTUALIZADA.xlsx')
 
   // Use readFileSync + XLSX.read() instead of XLSX.readFile() to avoid
   // path-with-spaces issues on Windows.

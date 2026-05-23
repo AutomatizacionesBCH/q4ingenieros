@@ -106,11 +106,9 @@ let wb: XLSX.WorkBook | null = null
 
 function getControlWorkbook(): XLSX.WorkBook {
   if (wb) return wb
-  const filePath = path.join(
-    process.cwd(),
-    '..',
-    'CONTROL_INGENIERIA_Q4_2026_OPTIMIZADO.xlsx',
-  )
+  const filePath =
+    process.env.CONTROL_EXCEL_PATH ??
+    path.join(process.cwd(), 'data', 'CONTROL_INGENIERIA_Q4_2026_OPTIMIZADO.xlsx')
   const buffer = fs.readFileSync(filePath)
   wb = XLSX.read(buffer, {
     type: 'buffer',
