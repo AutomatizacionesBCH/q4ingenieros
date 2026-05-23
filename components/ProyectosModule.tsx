@@ -621,10 +621,23 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
 
   const observations = edits.observations !== undefined ? edits.observations : (detail.observations ?? '')
 
-  // Analysis (based on budget vs egresos)
-  const totalNeto  = budget != null && egresos != null ? budget - egresos : null
-  const margen     = budget != null && budget > 0 && totalNeto != null ? totalNeto / budget : null
-  const costoVenta = budget != null && budget > 0 && egresos   != null ? egresos   / budget : null
+  // Analysis — prefer Excel's pre-calculated values, fall back to computed
+  const utilityCalc = budget != null && egresos != null ? budget - egresos : null
+  const utilityShow = detail.utility ?? utilityCalc
+  const marginShow  = detail.margin  ?? (budget != null && budget > 0 && utilityShow != null ? utilityShow / budget : null)
+  const costoVenta  = budget != null && budget > 0 && egresos != null ? egresos / budget : null
+
+  // Total Con Impuesto para el pie de la tabla de Egresos
+  const totalWithTax = detail.expenses.reduce((sum, e, i) => {
+    const ov   = edits.expenses?.[i] ?? {}
+    const net  = ov.amountNet ?? e.amountNet ?? null
+    const tipo = ov.tipo ?? null
+    if (net != null && tipo != null) {
+      return sum + Math.round(net * (tipo === 'factura' ? 1.19 : 1.153))
+    }
+    return sum
+  }, 0)
+  const hasExpTipos = detail.expenses.some((_, i) => (edits.expenses?.[i]?.tipo) != null)
 
   const kpiProps = (field: EditField, value: number | null, color: string, label: string) => ({
     label, value, color,
@@ -787,7 +800,9 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
                     {fmtCLP(totalEgresosCalc)}
                   </td>
                   <td style={TD} />
-                  <td style={TD} />
+                  <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: C.textSec, fontVariantNumeric: 'tabular-nums' }}>
+                    {hasExpTipos ? fmtCLP(totalWithTax) : '—'}
+                  </td>
                 </tr>
               </tfoot>
             </table>
@@ -802,10 +817,10 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <tbody>
               {([
-                { label: 'Total Egresos',            value: fmtCLP(egresos),   color: C.danger,  bold: false },
-                { label: 'Total Neto Q4 Ingenieros', value: fmtCLP(totalNeto), color: (totalNeto ?? 0) >= 0 ? C.success : C.danger, bold: true },
-                { label: 'Margen de Utilidad', value: margen     != null ? `${(margen     * 100).toFixed(1)}%` : '—', color: (margen ?? 0) >= 0 ? C.success : C.danger, bold: true },
-                { label: 'Costo-Venta',        value: costoVenta != null ? `${(costoVenta * 100).toFixed(1)}%` : '—', color: C.textSec, bold: false },
+                { label: 'Total Egresos',      value: fmtCLP(egresos),      color: C.danger,  bold: false },
+                { label: 'Utilidad',           value: fmtCLP(utilityShow),  color: (utilityShow ?? 0) >= 0 ? C.success : C.danger, bold: true },
+                { label: 'Margen de Utilidad', value: marginShow  != null ? `${(marginShow  * 100).toFixed(1)}%` : '—', color: (marginShow  ?? 0) >= 0 ? C.success : C.danger, bold: true },
+                { label: 'Costo-Venta',        value: costoVenta  != null ? `${(costoVenta  * 100).toFixed(1)}%` : '—', color: C.textSec, bold: false },
               ] as { label: string; value: string; color: string; bold: boolean }[]).map((row, i) => (
                 <tr key={i} style={{ borderTop: i > 0 ? `1px solid ${C.border}` : 'none', background: i % 2 === 0 ? C.listBg : C.card }}>
                   <td style={{ ...TD, fontWeight: row.bold ? 600 : 400, color: C.textSec, width: '60%' }}>{row.label}</td>
