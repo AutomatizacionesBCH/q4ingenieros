@@ -167,10 +167,16 @@ function detectExpenseSections(
   raw: Array<{ description: string; amountNet: number | null; amountWithTax: number | null }>,
 ): Expense[] {
   return raw.map((exp, i) => {
-    // No amount → pure section header
+    // No amount → pure category header (e.g. ARQUITECTURA)
     if (exp.amountNet === null) return { ...exp, isSection: true }
 
-    // Check whether this amount equals the sum of ≥2 immediately following rows
+    // Rows whose description contains "N°" are always numbered leaf items
+    // (EP N°1, BH N°2 …) — never section headers, even if a coincidental
+    // sum of following rows happens to equal this row's amount.
+    if (/n[°o]\d/i.test(exp.description)) return { ...exp, isSection: false }
+
+    // Check whether this amount equals the sum of ≥2 immediately following rows.
+    // Identifies subtotal headers: ESTRUCTURAL, ETAPA 1, ETAPA 2 …
     let cumSum = 0
     let count  = 0
     for (let j = i + 1; j < raw.length; j++) {
