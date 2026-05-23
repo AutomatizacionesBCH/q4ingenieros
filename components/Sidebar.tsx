@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
+import { useState, useEffect } from 'react'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
 export const SIDEBAR_W = 240
@@ -23,9 +24,23 @@ const MODULES = [
   { href: '/control-pendiente', label: 'Pendiente Histórico',  short: 'Pendiente',  icon: '◉' },
 ]
 
+function useUF() {
+  const [uf, setUf] = useState<{ value: number; date: string } | null>(null)
+  useEffect(() => {
+    fetch('/api/uf')
+      .then(r => r.json())
+      .then((d: { value?: number; date?: string }) => {
+        if (d.value) setUf({ value: d.value, date: d.date ?? '' })
+      })
+      .catch(() => {})
+  }, [])
+  return uf
+}
+
 export function Sidebar() {
   const pathname  = usePathname()
   const isMobile  = useIsMobile()
+  const uf        = useUF()
 
   if (isMobile) {
     // ── Bottom tab bar ────────────────────────────────────────────────────────
@@ -152,6 +167,37 @@ export function Sidebar() {
         borderTop: `1px solid ${C.divider}`,
         flexShrink: 0,
       }}>
+        {/* UF indicator */}
+        <div style={{
+          marginBottom: 10,
+          padding: '8px 10px',
+          borderRadius: 7,
+          background: 'rgba(255,255,255,0.04)',
+          border: `1px solid ${C.divider}`,
+        }}>
+          <div style={{
+            fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
+            textTransform: 'uppercase', color: C.muted, marginBottom: 3,
+          }}>
+            UF Hoy
+          </div>
+          {uf ? (
+            <>
+              <div style={{
+                fontSize: 14, fontWeight: 700, color: C.text,
+                fontVariantNumeric: 'tabular-nums', lineHeight: 1,
+              }}>
+                $ {Math.round(uf.value).toLocaleString('es-CL')}
+              </div>
+              <div style={{ fontSize: 9, color: C.muted, marginTop: 3, opacity: 0.7 }}>
+                {uf.date ? uf.date.split('-').reverse().join('/') : ''}
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: 11, color: C.muted, opacity: 0.5 }}>cargando…</div>
+          )}
+        </div>
+
         <div style={{ color: C.muted, fontSize: 10 }}>Q4 Ingenieros SpA · v1.0</div>
         <div style={{ color: '#3A4A60', fontSize: 10, marginTop: 2 }}>77.505.289-9</div>
       </div>
