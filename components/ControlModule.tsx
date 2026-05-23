@@ -633,8 +633,6 @@ export function ControlModule({ data }: { data: ControlData }) {
           )}
         </div>
 
-        <PendienteSection p={data.pendiente} />
-
         {data.summary.length > 0 && <SummaryTable summary={data.summary} totals={data.totals} />}
 
         {/* Section label */}
