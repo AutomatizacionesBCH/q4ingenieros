@@ -1,4 +1,4 @@
-import type { ProjectScope } from './project'
+import type { ProjectScope, ManagementType } from './project'
 
 /** Serializable shape passed from Server → Client Component */
 export interface ProjectListItem {
@@ -8,6 +8,7 @@ export interface ProjectListItem {
   status: string
   isFinalized: boolean
   scope: ProjectScope
+  managementType: ManagementType
   pending: number | null
   margin: number | null
   /** Only EP/Anticipo items from the INGRESOS block */

@@ -11,11 +11,9 @@ import type { ProjectListItem } from '@/types/ui'
 export default function ProyectosPage() {
   const { projects, stats } = getProjectsIndex()
 
-  // Build list items: summary + EP data from detail (module cache)
   const listItems: ProjectListItem[] = projects.map(p => {
     const detail = getProjectDetail(p.id) // null for project 174
 
-    // Filter EPs to only EP/Anticipo items per spec
     const eps =
       detail?.eps.filter(ep => /^(EP|Anticipo)/i.test(ep.label.trim())) ?? []
 
@@ -26,6 +24,7 @@ export default function ProyectosPage() {
       status: p.status,
       isFinalized: p.isFinalized,
       scope: p.scope,
+      managementType: p.managementType,
       pending: detail?.pending ?? null,
       margin: detail?.margin ?? null,
       eps,

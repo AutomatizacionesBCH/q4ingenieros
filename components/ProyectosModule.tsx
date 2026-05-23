@@ -1,234 +1,200 @@
 'use client'
 
-import { useState, useMemo, useEffect, useCallback } from 'react'
-import { formatCLP, formatDate, getStatusStyle } from '@/lib/format'
-import type { ProjectListItem, EpSlim } from '@/types/ui'
-import type { ProjectStats, ProjectDetail, EP, Expense } from '@/types/project'
+import { useState, useMemo, useCallback } from 'react'
+import type { ProjectListItem } from '@/types/ui'
+import type { ProjectDetail, EP, ProjectStats } from '@/types/project'
 
-// ─── Palette ──────────────────────────────────────────────────────────────────
+// ─── Design tokens ────────────────────────────────────────────────────────────
+
 const C = {
-  canvas:    '#0F1A2E',
-  surface:   '#162138',
-  card:      '#1D2D47',
-  cardHov:   '#243558',
-  orange:    '#E5501E',
-  primary:   '#F0EDE8',
-  secondary: '#8A9BB8',
-  muted:     '#5A7090',
-  success:   '#3D8B5E',
-  warning:   '#D4A017',
-  danger:    '#C0392B',
-  border:    'rgba(255,255,255,0.08)',
-  borderSt:  'rgba(255,255,255,0.13)',
+  canvas:        '#F0F2F6',
+  card:          '#FFFFFF',
+  border:        '#E2E8F0',
+  textPrimary:   '#0F1A2E',
+  textSec:       '#64748B',
+  textMuted:     '#94A3B8',
+  orange:        '#E5501E',
+  orangeFaint:   'rgba(229, 80, 30, 0.06)',
+  orangeBorder:  'rgba(229, 80, 30, 0.22)',
+  success:       '#16A34A',
+  successBg:     '#F0FDF4',
+  successBorder: '#BBF7D0',
+  warning:       '#CA8A04',
+  warningBg:     '#FEFCE8',
+  warningBorder: '#FDE68A',
+  danger:        '#DC2626',
+  dangerBg:      '#FEF2F2',
+  dangerBorder:  '#FECACA',
+  listBg:        '#F8FAFC',
 } as const
 
-// ─── EP Tracker — compact dots (list panel) ───────────────────────────────────
+// ─── Formatters ───────────────────────────────────────────────────────────────
 
-function EPTrackerCompact({ eps }: { eps: EpSlim[] }) {
-  const visible = eps.slice(0, 8)
-  const hasMore = eps.length > 8
+function fmtCLP(v: number | null | undefined): string {
+  if (v == null) return '—'
+  return '$ ' + Math.round(v).toLocaleString('es-CL')
+}
 
-  if (eps.length === 0) {
-    return <span style={{ color: C.muted, fontSize: 10 }}>Sin EPs</span>
-  }
+function fmtDate(d: string | Date | null | undefined): string {
+  if (!d) return '—'
+  const s = typeof d === 'string' ? d : (d as Date).toISOString()
+  const [y, m, day] = s.slice(0, 10).split('-')
+  return `${day}/${m}/${y}`
+}
 
+// ─── Status helpers ───────────────────────────────────────────────────────────
+
+interface Badge { color: string; bg: string; border: string; label: string }
+
+function getStatusBadge(status: string, isFinalized: boolean): Badge {
+  if (isFinalized)
+    return { color: C.success, bg: C.successBg, border: C.successBorder, label: 'Finalizado' }
+  const s = status.toLowerCase()
+  if (s.includes('revisión') || s.includes('subsanacion') || s.includes('subsanación'))
+    return { color: C.warning, bg: C.warningBg, border: C.warningBorder, label: status }
+  if (s.includes('proceso') || s.includes('diseño'))
+    return { color: C.orange, bg: '#FFF7F4', border: C.orangeBorder, label: status }
+  return { color: C.textSec, bg: C.listBg, border: C.border, label: status || 'Sin estado' }
+}
+
+function getDotColor(status: string, isFinalized: boolean): string {
+  if (isFinalized) return C.success
+  const s = status.toLowerCase()
+  if (s.includes('revisión') || s.includes('subsanacion')) return C.warning
+  if (s.includes('proceso') || s.includes('diseño')) return C.orange
+  return C.textMuted
+}
+
+function gestionLabel(g: string | null | undefined): string {
+  if (g === 'm') return 'Memoria'
+  if (g === 'i') return 'Ingeniería'
+  if (g === 'e') return 'Especialidades'
+  return g ?? '—'
+}
+
+// ─── EP Tracker Compact ───────────────────────────────────────────────────────
+
+function EPTrackerCompact({ eps }: { eps: { isPaid: boolean }[] }) {
+  if (!eps.length) return null
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-      <span style={{ color: C.muted, fontSize: 10, letterSpacing: '0.04em' }}>EPs</span>
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        {visible.map((ep, i) => {
-          const isPaid   = ep.isPaid
-          const hasMonto = ep.amount !== null && ep.amount > 0
-          const dotBg    = isPaid ? C.success : hasMonto ? C.orange : 'transparent'
-          const dotBorder = !hasMonto ? `1.5px solid ${C.secondary}` : 'none'
-          const tooltip = [
-            ep.label,
-            ep.amount != null ? formatCLP(ep.amount) : null,
-            ep.realDate ? `Recibido ${formatDate(ep.realDate)}`
-              : ep.estimatedDate ? `Est. ${formatDate(ep.estimatedDate)}`
-              : null,
-          ].filter(Boolean).join(' · ')
-
-          return (
-            <span key={i} style={{ display: 'flex', alignItems: 'center' }}>
-              {i > 0 && (
-                <span aria-hidden style={{
-                  display: 'inline-block', width: 6, height: 1,
-                  background: C.muted, opacity: 0.35,
-                }} />
-              )}
-              <span title={tooltip} aria-label={tooltip} style={{
-                display: 'inline-block', width: 8, height: 8,
-                borderRadius: '50%', background: dotBg, border: dotBorder,
-                flexShrink: 0, cursor: 'default',
-              }} />
-            </span>
-          )
-        })}
-        {hasMore && <span style={{ color: C.muted, fontSize: 10, marginLeft: 2 }}>…</span>}
-      </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+      {eps.map((ep, i) => (
+        <div
+          key={i}
+          title={ep.isPaid ? 'Pagado' : 'Pendiente'}
+          style={{
+            width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+            background: ep.isPaid ? C.success : C.orange,
+          }}
+        />
+      ))}
     </div>
   )
 }
 
-// ─── EP Tracker — expanded vertical (detail panel) ────────────────────────────
+// ─── EP Tracker Expanded ──────────────────────────────────────────────────────
 
 function EPTrackerExpanded({ eps }: { eps: EP[] }) {
-  const epItems = eps.filter(ep => /^(EP|Anticipo)/i.test(ep.label.trim()))
-
-  if (epItems.length === 0) {
-    return <p style={{ color: C.muted, fontSize: 13, padding: '8px 0' }}>Sin estados de pago registrados.</p>
-  }
-
+  if (!eps.length)
+    return <p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Sin estados de pago registrados.</p>
   return (
-    <div style={{ position: 'relative', paddingLeft: 20 }}>
-      {/* Vertical rail */}
-      <div style={{
-        position: 'absolute', left: 6, top: 12, bottom: 12,
-        width: 1, background: C.border,
-      }} />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {epItems.map((ep, i) => {
-          const isPaid   = ep.isPaid
-          const hasMonto = ep.amount !== null && ep.amount > 0
-          const dotColor  = isPaid ? C.success : hasMonto ? C.orange : C.card
-          const dotBorder = isPaid ? C.success : hasMonto ? C.orange : C.secondary
-
-          return (
-            <div key={i} style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 12, padding: '8px 0' }}>
-              {/* Milestone dot */}
-              <div style={{
-                position: 'absolute', left: -20, top: 13,
-                width: 12, height: 12, borderRadius: '50%',
-                background: dotColor, border: `2px solid ${dotBorder}`,
-                flexShrink: 0,
-              }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '2px 12px' }}>
-                  <span style={{ color: C.primary, fontSize: 13, fontWeight: 600 }}>{ep.label}</span>
-                  {ep.amount !== null && (
-                    <span style={{
-                      color: isPaid ? C.success : hasMonto ? C.orange : C.secondary,
-                      fontSize: 13, fontWeight: 700,
-                      fontVariantNumeric: 'tabular-nums',
-                    }}>
-                      {formatCLP(ep.amount)}
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontSize: 11, marginTop: 2 }}>
-                  {isPaid && ep.realDate ? (
-                    <span style={{ color: C.success }}>Recibido · {formatDate(ep.realDate)}</span>
-                  ) : ep.estimatedDate ? (
-                    <span style={{ color: C.orange }}>Estimado · {formatDate(ep.estimatedDate)}</span>
-                  ) : (
-                    <span style={{ color: C.muted }}>Sin fecha</span>
-                  )}
-                  {isPaid && ep.estimatedDate && (
-                    <span style={{ color: C.muted, marginLeft: 8 }}>est. {formatDate(ep.estimatedDate)}</span>
-                  )}
-                </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {eps.map((ep, i) => {
+        const paid = !!ep.realDate
+        return (
+          <div
+            key={i}
+            style={{
+              display: 'flex', alignItems: 'flex-start', gap: 12,
+              padding: '11px 14px', borderRadius: 8,
+              background: paid ? C.successBg : C.orangeFaint,
+              border: `1px solid ${paid ? C.successBorder : C.orangeBorder}`,
+            }}
+          >
+            <div style={{
+              width: 9, height: 9, borderRadius: '50%', flexShrink: 0, marginTop: 3,
+              background: paid ? C.success : C.orange,
+            }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.textPrimary }}>
+                {ep.label || `EP ${i + 1}`}
+              </div>
+              <div style={{ display: 'flex', gap: 14, marginTop: 4, flexWrap: 'wrap' }}>
+                {ep.amount != null && (
+                  <span style={{ fontSize: 12, color: C.textSec, fontVariantNumeric: 'tabular-nums' }}>
+                    {fmtCLP(ep.amount)}
+                  </span>
+                )}
+                {ep.estimatedDate && (
+                  <span style={{ fontSize: 12, color: C.textMuted }}>
+                    Est. {fmtDate(ep.estimatedDate)}
+                  </span>
+                )}
+                {ep.realDate && (
+                  <span style={{ fontSize: 12, color: C.success, fontWeight: 500 }}>
+                    ✓ {fmtDate(ep.realDate)}
+                  </span>
+                )}
               </div>
             </div>
-          )
-        })}
+            <span style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
+              textTransform: 'uppercase', flexShrink: 0,
+              color: paid ? C.success : C.orange,
+            }}>
+              {paid ? 'Pagado' : 'Pendiente'}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Table styles ─────────────────────────────────────────────────────────────
+
+const TH: React.CSSProperties = {
+  padding: '8px 12px', textAlign: 'left',
+  fontSize: 10, fontWeight: 700, color: '#94A3B8',
+  textTransform: 'uppercase', letterSpacing: '0.06em',
+}
+const TD: React.CSSProperties = {
+  padding: '8px 12px', fontSize: 12, color: '#0F1A2E',
+}
+
+// ─── Section title ────────────────────────────────────────────────────────────
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+      textTransform: 'uppercase', color: C.textMuted,
+      paddingBottom: 10, marginBottom: 12,
+      borderBottom: `1px solid ${C.border}`,
+    }}>
+      {children}
+    </div>
+  )
+}
+
+// ─── KPI card ─────────────────────────────────────────────────────────────────
+
+function KpiCard({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div style={{
+      background: C.card, border: `1px solid ${C.border}`,
+      borderRadius: 10, padding: '12px 14px',
+    }}>
+      <div style={{
+        fontSize: 9, fontWeight: 700, letterSpacing: '0.09em',
+        textTransform: 'uppercase', color: C.textMuted, marginBottom: 6,
+      }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 15, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+        {value}
       </div>
     </div>
-  )
-}
-
-// ─── Expense Table ────────────────────────────────────────────────────────────
-
-function ExpenseTable({ expenses }: { expenses: Expense[] }) {
-  if (expenses.length === 0) {
-    return <p style={{ color: C.muted, fontSize: 13, padding: '8px 0' }}>Sin egresos registrados.</p>
-  }
-
-  const total = expenses.reduce((acc, e) => acc + (e.amountNet ?? 0), 0)
-
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-        <thead>
-          <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-            {['Concepto', 'Monto Neto', 'Con Impuesto'].map(h => (
-              <th key={h} style={{
-                padding: '6px 12px 6px 0', textAlign: 'left',
-                color: C.secondary, fontWeight: 500,
-              }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {expenses.map((e, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-              <td style={{ padding: '5px 12px 5px 0', color: C.primary }}>{e.description}</td>
-              <td style={{ padding: '5px 12px 5px 0', color: e.amountNet ? C.primary : C.muted, fontVariantNumeric: 'tabular-nums' }}>
-                {e.amountNet !== null ? formatCLP(e.amountNet) : '—'}
-              </td>
-              <td style={{ padding: '5px 0', color: e.amountWithTax ? C.secondary : C.muted, fontVariantNumeric: 'tabular-nums' }}>
-                {e.amountWithTax !== null ? formatCLP(e.amountWithTax) : '—'}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-        {total > 0 && (
-          <tfoot>
-            <tr style={{ borderTop: `1px solid ${C.borderSt}` }}>
-              <td style={{ paddingTop: 8, color: C.secondary, fontWeight: 600, fontSize: 11 }}>Total egresos</td>
-              <td style={{ paddingTop: 8, color: C.danger, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{formatCLP(total)}</td>
-              <td />
-            </tr>
-          </tfoot>
-        )}
-      </table>
-    </div>
-  )
-}
-
-// ─── Tax Table ────────────────────────────────────────────────────────────────
-
-function TaxTable({ expenses }: { expenses: Expense[] }) {
-  const taxed = expenses.filter(e => e.amountWithTax !== null)
-  if (taxed.length === 0) return null
-
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-        <thead>
-          <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-            {['Concepto', 'Monto con Impuesto'].map(h => (
-              <th key={h} style={{ padding: '6px 12px 6px 0', textAlign: 'left', color: C.secondary, fontWeight: 500 }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {taxed.map((e, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-              <td style={{ padding: '5px 12px 5px 0', color: C.primary }}>{e.description}</td>
-              <td style={{ padding: '5px 0', color: C.secondary, fontVariantNumeric: 'tabular-nums' }}>{formatCLP(e.amountWithTax)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-// ─── Detail Section ───────────────────────────────────────────────────────────
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section style={{
-      borderRadius: 10, padding: 16,
-      background: C.surface, border: `1px solid ${C.border}`,
-    }}>
-      <h2 style={{
-        fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
-        textTransform: 'uppercase', color: C.secondary, marginBottom: 10,
-      }}>{title}</h2>
-      {children}
-    </section>
   )
 }
 
@@ -236,216 +202,224 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Skeleton() {
   return (
-    <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {[140, 80, 200, 160].map((w, i) => (
+    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {[200, 140, 90, 180, 120, 160].map((w, i) => (
         <div key={i} style={{
-          height: 14, width: w, borderRadius: 4,
-          background: C.card,
-          animation: 'pulse 1.4s ease-in-out infinite',
-          opacity: 0.7,
+          height: 14, width: w, maxWidth: '90%',
+          borderRadius: 4, background: C.border, opacity: 0.7,
         }} />
       ))}
-      <style>{`@keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:.8} }`}</style>
     </div>
   )
 }
 
-// ─── Project Detail Panel ─────────────────────────────────────────────────────
+// ─── Empty state ──────────────────────────────────────────────────────────────
 
-function ProjectDetailPanel({ detail }: { detail: ProjectDetail }) {
-  const { color: statusColor, label: statusLabel } = getStatusStyle(detail.status)
-  const hasPending = detail.pending !== null && detail.pending > 0
-  const hasCollected = detail.totalCollected !== null && detail.totalCollected > 0
-  const totalEgresos = detail.expenses.reduce((acc, e) => acc + (e.amountNet ?? 0), 0)
-  const hasEgresos = totalEgresos > 0
-  const marginPct = detail.margin !== null ? (detail.margin * 100).toFixed(1) + '%' : null
-  const hasImputaciones = detail.expenses.some(e => e.amountWithTax !== null)
+function EmptyDetail({ total }: { total: number }) {
+  return (
+    <div style={{
+      flex: 1, display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      gap: 8, color: C.textMuted, padding: 40, textAlign: 'center',
+    }}>
+      <span style={{ fontSize: 36, opacity: 0.15 }}>⬡</span>
+      <span style={{ fontSize: 14 }}>Selecciona un proyecto</span>
+      <span style={{ fontSize: 12, opacity: 0.7 }}>
+        {total} proyecto{total !== 1 ? 's' : ''} disponible{total !== 1 ? 's' : ''}
+      </span>
+    </div>
+  )
+}
+
+// ─── Detail Panel ─────────────────────────────────────────────────────────────
+
+function DetailPanel({ detail }: { detail: ProjectDetail }) {
+  const totalEgresos = detail.expenses.reduce((s, e) => s + (e.amountNet ?? 0), 0)
+  const hasImputaciones = detail.expenses.some(e => e.amountWithTax != null)
+  const badge = getStatusBadge(detail.status ?? '', detail.isFinalized)
+  const marginPositive = (detail.margin ?? 0) >= 0
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* ── Project header ───────────────────────────────────────────── */}
-      <div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-          <span style={{ color: C.muted, fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>#{detail.id}</span>
-          {/* Status badge */}
-          <span style={{
-            color: statusColor, fontSize: 10, fontWeight: 600,
-            padding: '2px 8px', borderRadius: 999,
-            background: `${statusColor}18`, border: `1px solid ${statusColor}33`,
-          }}>{statusLabel}</span>
-          {/* Scope badge */}
-          {detail.scope && (
-            <span style={{
-              color: C.secondary, fontSize: 10, fontWeight: 500,
-              padding: '2px 8px', borderRadius: 999,
-              background: 'rgba(255,255,255,0.06)', border: `1px solid ${C.border}`,
-            }}>{detail.scope}</span>
-          )}
-          {detail.paymentModality && (
-            <span style={{ color: C.muted, fontSize: 10 }}>{detail.paymentModality}</span>
-          )}
-        </div>
-        <h1 style={{ color: C.primary, fontSize: 18, fontWeight: 700, lineHeight: 1.2, margin: 0 }}>
-          {detail.client}
-        </h1>
-        <p style={{ color: C.secondary, fontSize: 12, marginTop: 2 }}>{detail.name}</p>
-      </div>
-
-      {/* ── KPI Row ─────────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        {/* PENDIENTE — spans 2 cols on mobile, 1 on wide */}
-        <div style={{
-          gridColumn: '1 / -1',
-          borderRadius: 10, padding: '14px 16px',
-          background: hasPending ? 'rgba(229,80,30,0.07)' : C.surface,
-          border: `1px solid ${hasPending ? 'rgba(229,80,30,0.28)' : C.border}`,
-          minHeight: 80,
-          display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-        }}>
-          <span style={{
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: hasPending ? C.orange : C.secondary,
-          }}>Pendiente por cobrar</span>
-          <span style={{
-            color: hasPending ? C.orange : C.muted,
-            fontSize: hasPending ? '1.75rem' : '1.4rem',
-            fontWeight: 700,
-            lineHeight: 1,
-            fontVariantNumeric: 'tabular-nums',
-            marginTop: 8,
-          }}>
-            {detail.pending !== null ? formatCLP(detail.pending) : '—'}
-          </span>
-        </div>
-
-        {/* Ingresos acumulados */}
-        <div style={{ borderRadius: 10, padding: 12, background: C.surface, border: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: C.secondary }}>Ingresos</span>
-          <span style={{ color: hasCollected ? C.primary : C.muted, fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-            {detail.totalCollected !== null ? formatCLP(detail.totalCollected) : '—'}
-          </span>
-        </div>
-
-        {/* Total egresos */}
-        <div style={{ borderRadius: 10, padding: 12, background: C.surface, border: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: C.secondary }}>Egresos</span>
-          <span style={{ color: hasEgresos ? C.danger : C.muted, fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-            {hasEgresos ? formatCLP(totalEgresos) : '—'}
-          </span>
-        </div>
-
-        {/* Margen */}
-        <div style={{ borderRadius: 10, padding: 12, background: C.surface, border: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: C.secondary }}>Margen</span>
-          <span style={{
-            fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
-            color: detail.margin === null ? C.muted
-              : detail.margin < 0 ? C.danger
-              : detail.margin > 0.6 ? C.success
-              : C.warning,
-          }}>
-            {marginPct ?? '—'}
-          </span>
-          {detail.utility !== null && (
-            <span style={{ fontSize: 10, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>
-              {formatCLP(detail.utility)} utilidad
-            </span>
-          )}
-        </div>
-
-        {/* Budget net */}
-        {detail.budget.net !== null && (
-          <div style={{ borderRadius: 10, padding: 12, background: C.surface, border: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: C.secondary }}>Presupuesto neto</span>
-            <span style={{ color: detail.budget.net ? C.primary : C.muted, fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-              {formatCLP(detail.budget.net)}
-            </span>
+    <div style={{ padding: '20px 24px 32px' }}>
+      {/* Header */}
+      <div style={{ paddingBottom: 16, marginBottom: 20, borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 11, color: C.textMuted, marginBottom: 4 }}>
+              #{detail.id}
+            </div>
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: C.textPrimary, lineHeight: 1.3 }}>
+              {detail.name}
+            </h2>
+            <div style={{ fontSize: 13, color: C.textSec, marginTop: 4 }}>{detail.client}</div>
           </div>
-        )}
+          <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+            <span style={{
+              display: 'inline-flex', padding: '3px 10px', borderRadius: 20,
+              fontSize: 11, fontWeight: 600,
+              color: badge.color, background: badge.bg,
+              border: `1px solid ${badge.border}`,
+              whiteSpace: 'nowrap',
+            }}>
+              {badge.label}
+            </span>
+            {(detail.scope || detail.managementType) && (
+              <span style={{ fontSize: 11, color: C.textMuted }}>
+                {[detail.scope, gestionLabel(detail.managementType)].filter(Boolean).join(' · ')}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* ── EP Tracker ─────────────────────────────────────────────── */}
-      <Section title="Estados de Pago">
-        <EPTrackerExpanded eps={detail.eps} />
-      </Section>
+      {/* KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+        <KpiCard label="Presupuesto" value={fmtCLP(detail.budget?.net ?? null)} color={C.textPrimary} />
+        <KpiCard label="Cobrado"     value={fmtCLP(detail.totalCollected)}       color={C.success} />
+        <KpiCard label="Pendiente"   value={fmtCLP(detail.pending)}              color={C.orange} />
+        <KpiCard label="Egresos"     value={fmtCLP(totalEgresos || null)}        color={C.danger} />
+      </div>
 
-      {/* ── Egresos ────────────────────────────────────────────────── */}
-      <Section title="Egresos">
-        <ExpenseTable expenses={detail.expenses} />
-      </Section>
-
-      {/* ── Imputaciones con impuesto ───────────────────────────────── */}
-      {hasImputaciones && (
-        <Section title="Imputaciones con Impuesto">
-          <TaxTable expenses={detail.expenses} />
-        </Section>
+      {/* Margin */}
+      {detail.margin != null && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 14px', borderRadius: 8, marginBottom: 24,
+          background: marginPositive ? C.successBg : C.dangerBg,
+          border: `1px solid ${marginPositive ? C.successBorder : C.dangerBorder}`,
+        }}>
+          <span style={{ fontSize: 12, color: C.textSec }}>Margen de utilidad</span>
+          <span style={{ fontSize: 16, fontWeight: 700, color: marginPositive ? C.success : C.danger }}>
+            {Math.round(detail.margin * 100)}%
+          </span>
+        </div>
       )}
 
-      {/* ── Observaciones ─────────────────────────────────────────── */}
+      {/* EPs */}
+      <div style={{ marginBottom: 24 }}>
+        <SectionTitle>Estados de Pago ({detail.eps.length})</SectionTitle>
+        <EPTrackerExpanded eps={detail.eps} />
+      </div>
+
+      {/* Egresos */}
+      {detail.expenses.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <SectionTitle>Egresos ({detail.expenses.length})</SectionTitle>
+          <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: C.listBg }}>
+                  <th style={TH}>Descripción</th>
+                  <th style={{ ...TH, textAlign: 'right' }}>Monto Neto</th>
+                  {hasImputaciones && <th style={{ ...TH, textAlign: 'right' }}>Con Impuesto</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {detail.expenses.map((e, i) => (
+                  <tr key={i} style={{ borderTop: `1px solid ${C.border}` }}>
+                    <td style={TD}>{e.description || '—'}</td>
+                    <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: C.danger }}>
+                      {fmtCLP(e.amountNet)}
+                    </td>
+                    {hasImputaciones && (
+                      <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: C.textSec }}>
+                        {e.amountWithTax != null ? fmtCLP(e.amountWithTax) : '—'}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ background: C.listBg, borderTop: `2px solid ${C.border}` }}>
+                  <td style={{ ...TD, fontWeight: 700 }}>Total</td>
+                  <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: C.danger, fontVariantNumeric: 'tabular-nums' }}>
+                    {fmtCLP(totalEgresos)}
+                  </td>
+                  {hasImputaciones && <td style={TD} />}
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Observations */}
       {detail.observations && (
-        <Section title="Observaciones">
-          <p style={{ color: C.secondary, fontSize: 13, lineHeight: 1.6 }}>{detail.observations}</p>
-        </Section>
+        <div>
+          <SectionTitle>Observaciones</SectionTitle>
+          <div style={{
+            fontSize: 13, color: C.textSec, lineHeight: 1.65,
+            padding: '12px 14px', borderRadius: 8,
+            background: C.warningBg, border: `1px solid ${C.warningBorder}`,
+          }}>
+            {detail.observations}
+          </div>
+        </div>
       )}
     </div>
   )
 }
 
-// ─── Left panel list row ──────────────────────────────────────────────────────
+// ─── List Row ─────────────────────────────────────────────────────────────────
 
-function ListRow({
-  project,
-  isSelected,
-  onClick,
-}: {
-  project: ProjectListItem
+function ListRow({ p, isSelected, onClick }: {
+  p: ProjectListItem
   isSelected: boolean
   onClick: () => void
 }) {
-  const [hovered, setHovered] = useState(false)
-  const { color: dotColor } = getStatusStyle(project.status)
-
+  const dot = getDotColor(p.status ?? '', p.isFinalized)
   return (
     <button
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={{
-        display: 'flex', alignItems: 'center', gap: 8,
+        display: 'flex', flexDirection: 'column', gap: 2,
         width: '100%', textAlign: 'left',
-        padding: '6px 10px',
-        background: isSelected ? C.cardHov : hovered ? 'rgba(255,255,255,0.03)' : 'transparent',
-        borderLeft: `2px solid ${isSelected ? C.orange : 'transparent'}`,
-        borderRadius: 0,
+        padding: '10px 14px 10px 11px',
+        background: isSelected ? C.orangeFaint : 'transparent',
+        borderTop: 'none', borderRight: 'none',
+        borderBottom: `1px solid ${C.border}`,
+        borderLeft: `3px solid ${isSelected ? C.orange : 'transparent'}`,
         cursor: 'pointer',
-        transition: 'background 80ms',
       }}
     >
-      {/* Status dot */}
-      <span style={{
-        width: 7, height: 7, borderRadius: '50%',
-        background: dotColor, flexShrink: 0,
-      }} />
-      {/* ID */}
-      <span style={{
-        fontSize: 10, color: C.muted, flexShrink: 0,
-        fontVariantNumeric: 'tabular-nums',
-        minWidth: 28,
-      }}>#{project.id}</span>
-      {/* Client (truncated) */}
-      <span style={{
-        fontSize: 12, color: isSelected ? C.primary : C.secondary,
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        flex: 1, fontWeight: isSelected ? 600 : 400,
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span style={{ fontSize: 10, fontFamily: 'monospace', color: C.textMuted }}>#{p.id}</span>
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+      </div>
+      <div style={{
+        fontSize: 12, fontWeight: 600, color: C.textPrimary,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%',
       }}>
-        {project.client}
-      </span>
+        {p.name}
+      </div>
+      <div style={{
+        fontSize: 11, color: C.textSec,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%',
+      }}>
+        {p.client}
+      </div>
+      <EPTrackerCompact eps={p.eps} />
     </button>
   )
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Select style ─────────────────────────────────────────────────────────────
+
+const SEL: React.CSSProperties = {
+  height: 38, padding: '0 10px',
+  border: `1px solid ${C.border}`, borderRadius: 8,
+  fontSize: 13, color: '#0F1A2E',
+  background: '#FFFFFF', outline: 'none',
+  cursor: 'pointer', flexShrink: 0,
+}
+
+// ─── Filter types ─────────────────────────────────────────────────────────────
+
+type StatusF  = 'todos' | 'activos' | 'finalizados'
+type GestionF = 'todos' | 'm' | 'i' | 'e'
+type AmbitoF  = 'todos' | 'Público' | 'Privado'
+
+// ─── Module (exported) ────────────────────────────────────────────────────────
 
 interface Props {
   projects: ProjectListItem[]
@@ -453,256 +427,182 @@ interface Props {
 }
 
 export function ProyectosModule({ projects, stats }: Props) {
-  const [selectedId, setSelectedId]   = useState<number | null>(null)
-  const [detail, setDetail]           = useState<ProjectDetail | null>(null)
-  const [loading, setLoading]         = useState(false)
-  const [search, setSearch]           = useState('')
-  const [filter, setFilter]           = useState<'active' | 'all'>('active')
-  // Mobile: 'list' or 'detail'
-  const [mobileView, setMobileView]   = useState<'list' | 'detail'>('list')
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [detail, setDetail]         = useState<ProjectDetail | null>(null)
+  const [loading, setLoading]       = useState(false)
 
-  // Fetch detail when selectedId changes
-  const fetchDetail = useCallback(async (id: number) => {
-    setLoading(true)
+  const [search,   setSearch]   = useState('')
+  const [statusF,  setStatusF]  = useState<StatusF>('todos')
+  const [gestionF, setGestionF] = useState<GestionF>('todos')
+  const [ambitoF,  setAmbitoF]  = useState<AmbitoF>('todos')
+
+  const filtered = useMemo(() => projects.filter(p => {
+    if (statusF === 'activos'     && p.isFinalized)  return false
+    if (statusF === 'finalizados' && !p.isFinalized) return false
+    if (gestionF !== 'todos' && p.managementType !== gestionF) return false
+    if (ambitoF  !== 'todos' && p.scope !== ambitoF)           return false
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      return (
+        p.name.toLowerCase().includes(q) ||
+        p.client.toLowerCase().includes(q) ||
+        String(p.id).includes(q)
+      )
+    }
+    return true
+  }), [projects, search, statusF, gestionF, ambitoF])
+
+  const isFiltering = !!(search || statusF !== 'todos' || gestionF !== 'todos' || ambitoF !== 'todos')
+
+  const selectProject = useCallback(async (id: number) => {
+    if (id === selectedId) return
+    setSelectedId(id)
     setDetail(null)
+    setLoading(true)
     try {
       const res = await fetch(`/api/projects/${id}`)
-      if (res.ok) {
-        const data: ProjectDetail = await res.json()
-        setDetail(data)
-      } else {
-        setDetail(null)
-      }
-    } catch {
-      setDetail(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (selectedId !== null) {
-      fetchDetail(selectedId)
-    }
-  }, [selectedId, fetchDetail])
-
-  const handleSelect = (id: number) => {
-    setSelectedId(id)
-    setMobileView('detail')
-  }
-
-  // Filter + sort
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return projects
-      .filter(p => {
-        if (filter === 'active' && p.isFinalized) return false
-        if (q) {
-          return (
-            p.client.toLowerCase().includes(q) ||
-            p.name.toLowerCase().includes(q) ||
-            String(p.id).includes(q)
-          )
-        }
-        return true
-      })
-      .sort((a, b) => {
-        // Active before finalized, then by ID ascending
-        if (a.isFinalized !== b.isFinalized) return a.isFinalized ? 1 : -1
-        return a.id - b.id
-      })
-  }, [projects, search, filter])
-
-  // ── Render ────────────────────────────────────────────────────────────────
-
-  const leftPanel = (
-    <div
-      style={{
-        width: 280, minWidth: 280, maxWidth: 280,
-        borderRight: `1px solid ${C.border}`,
-        display: 'flex', flexDirection: 'column',
-        height: '100%', overflow: 'hidden',
-        background: C.surface,
-      }}
-      className="hidden md:flex"
-    >
-      {/* Search + filter bar */}
-      <div style={{ padding: '10px 10px 8px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
-        {/* Search */}
-        <div style={{ position: 'relative', marginBottom: 8 }}>
-          <svg
-            style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
-            width="12" height="12" viewBox="0 0 16 16" fill="none"
-          >
-            <circle cx="7" cy="7" r="5.5" stroke={C.muted} strokeWidth="1.5" />
-            <path d="M11 11l3 3" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar…"
-            style={{
-              width: '100%', background: C.card,
-              color: C.primary, border: `1px solid ${search ? C.borderSt : C.border}`,
-              borderRadius: 6, padding: '5px 28px 5px 26px',
-              fontSize: 11, outline: 'none', boxSizing: 'border-box',
-            }}
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              style={{
-                position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-                color: C.muted, background: 'none', border: 'none', cursor: 'pointer',
-                fontSize: 11, padding: 0,
-              }}
-            >✕</button>
-          )}
-        </div>
-
-        {/* Filter toggle */}
-        <div style={{ display: 'flex', gap: 4, background: C.card, borderRadius: 6, padding: 3 }}>
-          {([['active', 'Activos'], ['all', 'Todos']] as const).map(([val, lbl]) => (
-            <button
-              key={val}
-              onClick={() => setFilter(val)}
-              style={{
-                flex: 1, padding: '3px 0', borderRadius: 4, fontSize: 11,
-                fontWeight: 500, cursor: 'pointer', border: 'none',
-                background: filter === val ? C.surface : 'transparent',
-                color: filter === val ? C.primary : C.secondary,
-                transition: 'background 80ms',
-              }}
-            >{lbl}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* Count */}
-      <div style={{ padding: '5px 10px', flexShrink: 0 }}>
-        <span style={{ fontSize: 10, color: C.muted }}>
-          {filtered.length} proyecto{filtered.length !== 1 ? 's' : ''}
-        </span>
-      </div>
-
-      {/* List */}
-      <div style={{ flex: 1, overflowY: 'auto' }}>
-        {filtered.length === 0 ? (
-          <p style={{ color: C.muted, fontSize: 11, textAlign: 'center', padding: '24px 16px' }}>
-            Sin resultados
-          </p>
-        ) : (
-          filtered.map(p => (
-            <ListRow
-              key={p.id}
-              project={p}
-              isSelected={p.id === selectedId}
-              onClick={() => handleSelect(p.id)}
-            />
-          ))
-        )}
-      </div>
-    </div>
-  )
-
-  const rightPanel = (
-    <div
-      style={{
-        flex: 1, overflowY: 'auto', background: C.canvas,
-        display: 'flex', flexDirection: 'column',
-      }}
-    >
-      {selectedId === null ? (
-        <div style={{
-          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexDirection: 'column', gap: 8,
-        }}>
-          <span style={{ fontSize: 32, opacity: 0.3 }}>⬡</span>
-          <span style={{ color: C.muted, fontSize: 13 }}>Selecciona un proyecto</span>
-        </div>
-      ) : loading ? (
-        <Skeleton />
-      ) : detail ? (
-        <div style={{ padding: '16px 20px', maxWidth: 800 }}>
-          <ProjectDetailPanel detail={detail} />
-        </div>
-      ) : (
-        <div style={{ padding: 20 }}>
-          <p style={{ color: C.muted, fontSize: 13 }}>
-            Proyecto #{selectedId} — sin hoja de detalle en el archivo Excel.
-          </p>
-        </div>
-      )}
-    </div>
-  )
-
-  // ── Mobile layout (stacked with tabs) ────────────────────────────────────
-  const mobileListPanel = (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }} className="flex md:hidden">
-      {/* Mobile search + filter */}
-      <div style={{ padding: '10px 12px 8px', borderBottom: `1px solid ${C.border}`, flexShrink: 0, background: C.surface }}>
-        <div style={{ position: 'relative', marginBottom: 8 }}>
-          <svg style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
-            width="12" height="12" viewBox="0 0 16 16" fill="none">
-            <circle cx="7" cy="7" r="5.5" stroke={C.muted} strokeWidth="1.5" />
-            <path d="M11 11l3 3" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar…"
-            style={{ width: '100%', background: C.card, color: C.primary, border: `1px solid ${C.border}`, borderRadius: 6, padding: '5px 8px 5px 26px', fontSize: 12, outline: 'none', boxSizing: 'border-box' }} />
-        </div>
-        <div style={{ display: 'flex', gap: 4, background: C.card, borderRadius: 6, padding: 3 }}>
-          {([['active', 'Activos'], ['all', 'Todos']] as const).map(([val, lbl]) => (
-            <button key={val} onClick={() => setFilter(val)}
-              style={{ flex: 1, padding: '3px 0', borderRadius: 4, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: 'none', background: filter === val ? C.surface : 'transparent', color: filter === val ? C.primary : C.secondary }}>
-              {lbl}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div style={{ padding: '4px 12px', flexShrink: 0, background: C.surface }}>
-        <span style={{ fontSize: 10, color: C.muted }}>{filtered.length} proyectos</span>
-      </div>
-      <div style={{ flex: 1, overflowY: 'auto', background: C.surface }}>
-        {filtered.map(p => (
-          <ListRow key={p.id} project={p} isSelected={p.id === selectedId} onClick={() => handleSelect(p.id)} />
-        ))}
-      </div>
-    </div>
-  )
-
-  const mobileDetailPanel = (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }} className="flex md:hidden">
-      <div style={{ padding: '8px 12px', borderBottom: `1px solid ${C.border}`, background: C.surface, flexShrink: 0 }}>
-        <button
-          onClick={() => setMobileView('list')}
-          style={{ color: C.secondary, fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 6 }}
-        >
-          ← Proyectos
-        </button>
-      </div>
-      <div style={{ flex: 1, overflowY: 'auto', background: C.canvas }}>
-        {loading ? <Skeleton /> : detail ? (
-          <div style={{ padding: '16px 16px', maxWidth: 600 }}>
-            <ProjectDetailPanel detail={detail} />
-          </div>
-        ) : (
-          <p style={{ color: C.muted, padding: 20, fontSize: 13 }}>Sin detalle disponible.</p>
-        )}
-      </div>
-    </div>
-  )
+      if (res.ok) setDetail(await res.json())
+    } catch { /* silent */ }
+    setLoading(false)
+  }, [selectedId])
 
   return (
-    <div style={{ display: 'flex', height: '100%', flex: 1, overflow: 'hidden' }}>
-      {/* ── Desktop layout ─────────────────────────────────────────── */}
-      {leftPanel}
-      <div className="hidden md:flex" style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
-        {rightPanel}
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: C.canvas }}>
+
+      {/* Page header */}
+      <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.textPrimary }}>Proyectos</h1>
+            <p style={{ margin: '2px 0 0', fontSize: 13, color: C.textSec }}>
+              Gestión de proyectos de ingeniería vial
+            </p>
+          </div>
+          {/* Stat chips */}
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            {[
+              { label: 'Total',       value: stats.total,     color: C.textPrimary },
+              { label: 'Activos',     value: stats.active,    color: C.orange },
+              { label: 'Finalizados', value: stats.finalized, color: C.success },
+            ].map(s => (
+              <div key={s.label} style={{
+                background: C.card, border: `1px solid ${C.border}`,
+                borderRadius: 10, padding: '8px 14px', textAlign: 'center', minWidth: 62,
+              }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</div>
+                <div style={{ fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 3 }}>
+                  {s.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Search + filters */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', paddingBottom: 16 }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+            <span style={{
+              position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)',
+              color: C.textMuted, fontSize: 14, pointerEvents: 'none',
+            }}>🔍</span>
+            <input
+              type="search"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar por nombre, cliente o número..."
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                paddingLeft: 34, paddingRight: 12,
+                height: 38, border: `1px solid ${C.border}`,
+                borderRadius: 8, fontSize: 13, color: C.textPrimary,
+                background: C.card, outline: 'none',
+              }}
+            />
+          </div>
+
+          <select value={statusF}  onChange={e => setStatusF(e.target.value as StatusF)}   style={SEL}>
+            <option value="todos">Estado: Todos</option>
+            <option value="activos">Activos</option>
+            <option value="finalizados">Finalizados</option>
+          </select>
+
+          <select value={gestionF} onChange={e => setGestionF(e.target.value as GestionF)} style={SEL}>
+            <option value="todos">Gestión: Todos</option>
+            <option value="m">Memoria</option>
+            <option value="i">Ingeniería</option>
+            <option value="e">Especialidades</option>
+          </select>
+
+          <select value={ambitoF}  onChange={e => setAmbitoF(e.target.value as AmbitoF)}   style={SEL}>
+            <option value="todos">Ámbito: Todos</option>
+            <option value="Público">Público</option>
+            <option value="Privado">Privado</option>
+          </select>
+
+          {isFiltering && (
+            <span style={{ fontSize: 12, color: C.textMuted, whiteSpace: 'nowrap' }}>
+              {filtered.length} resultado{filtered.length !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* ── Mobile layout ──────────────────────────────────────────── */}
-      {mobileView === 'list' ? mobileListPanel : mobileDetailPanel}
+      {/* Split panel */}
+      <div style={{
+        flex: 1, display: 'flex', overflow: 'hidden',
+        margin: '0 24px 24px',
+        border: `1px solid ${C.border}`, borderRadius: 12,
+        background: C.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+      }}>
+        {/* List */}
+        <div style={{
+          width: 300, flexShrink: 0,
+          borderRight: `1px solid ${C.border}`,
+          display: 'flex', flexDirection: 'column',
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            padding: '9px 14px', flexShrink: 0,
+            background: C.listBg, borderBottom: `1px solid ${C.border}`,
+          }}>
+            <span style={{
+              fontSize: 11, fontWeight: 600, color: C.textMuted,
+              textTransform: 'uppercase', letterSpacing: '0.06em',
+            }}>
+              {filtered.length} proyectos
+            </span>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {filtered.length === 0 ? (
+              <div style={{ padding: 24, textAlign: 'center', color: C.textMuted, fontSize: 13 }}>
+                Sin resultados para los filtros seleccionados
+              </div>
+            ) : (
+              filtered.map(p => (
+                <ListRow
+                  key={p.id}
+                  p={p}
+                  isSelected={p.id === selectedId}
+                  onClick={() => selectProject(p.id)}
+                />
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Detail */}
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          {loading ? (
+            <Skeleton />
+          ) : detail ? (
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              <DetailPanel detail={detail} />
+            </div>
+          ) : (
+            <EmptyDetail total={filtered.length} />
+          )}
+        </div>
+      </div>
     </div>
   )
 }
