@@ -333,10 +333,8 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 const PROJ_EDIT_KEY = 'proj_edit_v1'
 interface ProjEdits {
   budget?:       number
-  collected?:    number
-  pending?:      number
   egresos?:      number
-  eps?:          Record<number, { label?: string; amount?: number; estimatedDate?: string; realDate?: string }>
+  eps?:          Record<number, { label?: string; amount?: number; paid?: boolean }>
   expenses?:     Record<number, { description?: string; amountNet?: number; amountWithTax?: number }>
   observations?: string
 }
@@ -353,7 +351,7 @@ function saveProjEdits(id: number, edits: ProjEdits) {
     localStorage.setItem(PROJ_EDIT_KEY, JSON.stringify(all))
   } catch {}
 }
-type EditField = 'budget' | 'collected' | 'pending' | 'egresos'
+type EditField = 'budget' | 'egresos'
 
 function EditableKpi({
   label, value, color, isEditing, isOverridden, inputVal,
@@ -422,7 +420,7 @@ function EditableKpi({
 
 type ActiveEdit =
   | { kind: 'kpi';     field: EditField }
-  | { kind: 'ep';      idx: number; col: 'label' | 'amount' | 'estDate' | 'realDate' }
+  | { kind: 'ep';      idx: number; col: 'label' | 'amount' }
   | { kind: 'expense'; idx: number; col: 'description' | 'amountNet' | 'amountWithTax' }
   | { kind: 'obs' }
   | null
@@ -461,7 +459,14 @@ function EditableCell({
           }}
         />
       ) : (
-        <span style={{ display: 'block', minHeight: 20 }}>{value || '—'}</span>
+        <span style={{
+          display: 'flex', alignItems: 'center', minHeight: 20, gap: 5,
+          justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
+        }}>
+          {align === 'right' && <span style={{ fontSize: 9, color: C.textMuted, opacity: 0.45 }}>✎</span>}
+          <span>{value || '—'}</span>
+          {align !== 'right' && <span style={{ fontSize: 9, color: C.textMuted, opacity: 0.45 }}>✎</span>}
+        </span>
       )}
     </td>
   )
@@ -500,6 +505,25 @@ function EmptyDetail({ total }: { total: number }) {
   )
 }
 
+// ─── Static KPI card (auto-calculated, not editable) ─────────────────────────
+
+function StaticKpi({ label, value, color, hint }: { label: string; value: number; color: string; hint: string }) {
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 16px' }}>
+      <div style={{
+        fontSize: 9, fontWeight: 700, letterSpacing: '0.09em',
+        textTransform: 'uppercase', color: C.textMuted, marginBottom: 8,
+      }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 17, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+        {fmtCLP(value)}
+      </div>
+      <div style={{ fontSize: 9, color: C.textMuted, marginTop: 5, opacity: 0.5 }}>{hint}</div>
+    </div>
+  )
+}
+
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
 
 function DetailPanel({ detail }: { detail: ProjectDetail }) {
@@ -515,17 +539,9 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
     setActive(null)
   }, [detail.id])
 
-  function persist(next: ProjEdits) {
-    setEdits(next)
-    saveProjEdits(detail.id, next)
-  }
+  function persist(next: ProjEdits) { setEdits(next); saveProjEdits(detail.id, next) }
+  function startEdit(ae: NonNullable<ActiveEdit>, initVal: string) { setActive(ae); setInputVal(initVal) }
 
-  function startEdit(ae: NonNullable<ActiveEdit>, initVal: string) {
-    setActive(ae)
-    setInputVal(initVal)
-  }
-
-  // Is this particular edit slot currently active?
   const isAct = (ae: NonNullable<ActiveEdit>): boolean => {
     if (!active) return false
     if (ae.kind === 'kpi')     return active.kind === 'kpi'     && active.field === ae.field
@@ -534,14 +550,10 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
     return active.kind === 'obs'
   }
 
-  // Props spread for EditableCell
   const ec = (ae: NonNullable<ActiveEdit>, initVal: string) => ({
-    isEditing: isAct(ae),
-    inputVal:  isAct(ae) ? inputVal : '',
-    onStart:   () => startEdit(ae, initVal),
-    onChange:  setInputVal,
-    onCommit:  commitEdit,
-    onCancel:  () => setActive(null),
+    isEditing: isAct(ae), inputVal: isAct(ae) ? inputVal : '',
+    onStart: () => startEdit(ae, initVal), onChange: setInputVal,
+    onCommit: commitEdit, onCancel: () => setActive(null),
   })
 
   function commitEdit() {
@@ -555,19 +567,17 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
     } else if (active.kind === 'ep') {
       const epEdits = { ...(edits.eps ?? {}) }
       const cur = { ...(epEdits[active.idx] ?? {}) }
-      if      (active.col === 'amount')   { const n = toNum(inputVal); if (!isNaN(n)) cur.amount = n }
-      else if (active.col === 'estDate')  { cur.estimatedDate = inputVal || undefined }
-      else if (active.col === 'realDate') { cur.realDate      = inputVal || undefined }
-      else                                { cur.label         = inputVal || undefined }
+      if (active.col === 'amount') { const n = toNum(inputVal); if (!isNaN(n)) cur.amount = n }
+      else                         { cur.label = inputVal || undefined }
       epEdits[active.idx] = cur
       persist({ ...edits, eps: epEdits })
 
     } else if (active.kind === 'expense') {
       const expEdits = { ...(edits.expenses ?? {}) }
       const cur = { ...(expEdits[active.idx] ?? {}) }
-      if      (active.col === 'description')   { cur.description  = inputVal || undefined }
-      else if (active.col === 'amountNet')     { const n = toNum(inputVal); if (!isNaN(n)) cur.amountNet = n }
-      else                                     { const n = toNum(inputVal); if (!isNaN(n)) cur.amountWithTax = n }
+      if      (active.col === 'description') { cur.description  = inputVal || undefined }
+      else if (active.col === 'amountNet')   { const n = toNum(inputVal); if (!isNaN(n)) cur.amountNet = n }
+      else                                   { const n = toNum(inputVal); if (!isNaN(n)) cur.amountWithTax = n }
       expEdits[active.idx] = cur
       persist({ ...edits, expenses: expEdits })
 
@@ -577,29 +587,36 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
     setActive(null)
   }
 
-  function resetField(field: EditField) {
-    const next = { ...edits }; delete next[field]; persist(next)
+  function resetField(field: EditField) { const next = { ...edits }; delete next[field]; persist(next) }
+
+  // EP helpers — paid state driven by override, falling back to realDate presence
+  function isEpPaid(ep: EP, idx: number): boolean {
+    const ov = edits.eps?.[idx]
+    if (ov?.paid !== undefined) return ov.paid
+    return !!ep.realDate
   }
-
-  // Resolved values (edit override ?? Excel original)
-  const budget    = edits.budget    ?? detail.budget?.net    ?? null
-  const collected = edits.collected ?? detail.totalCollected ?? null
-  const pending   = edits.pending   ?? detail.pending        ?? null
-  const egresos   = edits.egresos   ?? (totalEgresosCalc || null)
-
+  function toggleEpPaid(idx: number) {
+    const cur = isEpPaid(detail.eps[idx], idx)
+    const epEdits = { ...(edits.eps ?? {}) }
+    epEdits[idx] = { ...(epEdits[idx] ?? {}), paid: !cur }
+    persist({ ...edits, eps: epEdits })
+  }
   function getEp(ep: EP, idx: number) {
     const ov = edits.eps?.[idx] ?? {}
-    return {
-      label:    ov.label         ?? ep.label         ?? `EP ${idx + 1}`,
-      amount:   ov.amount        ?? ep.amount        ?? null,
-      estDate:  ov.estimatedDate ?? ep.estimatedDate ?? null,
-      realDate: ov.realDate      ?? ep.realDate      ?? null,
-    }
+    return { label: ov.label ?? ep.label ?? `EP ${idx + 1}`, amount: ov.amount ?? ep.amount ?? null }
   }
+
+  // Auto-calculated KPIs from EP states
+  const pagadoCalc    = detail.eps.reduce((s, ep, i) =>  isEpPaid(ep, i) ? s + (getEp(ep, i).amount ?? 0) : s, 0)
+  const pendienteCalc = detail.eps.reduce((s, ep, i) => !isEpPaid(ep, i) ? s + (getEp(ep, i).amount ?? 0) : s, 0)
+
+  // Manually editable KPIs
+  const budget  = edits.budget  ?? detail.budget?.net ?? null
+  const egresos = edits.egresos ?? (totalEgresosCalc || null)
 
   const observations = edits.observations !== undefined ? edits.observations : (detail.observations ?? '')
 
-  // Analysis
+  // Analysis (based on budget vs egresos)
   const totalNeto  = budget != null && egresos != null ? budget - egresos : null
   const margen     = budget != null && budget > 0 && totalNeto != null ? totalNeto / budget : null
   const costoVenta = budget != null && budget > 0 && egresos   != null ? egresos   / budget : null
@@ -621,12 +638,8 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
 
       {/* Header */}
       <div style={{ paddingBottom: 20, marginBottom: 24, borderBottom: `1px solid ${C.border}` }}>
-        <div style={{ fontFamily: 'monospace', fontSize: 12, color: C.textMuted, marginBottom: 6 }}>
-          #{detail.id}
-        </div>
-        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.textPrimary, lineHeight: 1.3 }}>
-          {detail.name}
-        </h2>
+        <div style={{ fontFamily: 'monospace', fontSize: 12, color: C.textMuted, marginBottom: 6 }}>#{detail.id}</div>
+        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.textPrimary, lineHeight: 1.3 }}>{detail.name}</h2>
         <div style={{ fontSize: 14, color: C.textSec, marginTop: 6 }}>{detail.client}</div>
         {(detail.scope || detail.managementType) && (
           <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>
@@ -635,55 +648,54 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
         )}
       </div>
 
-      {/* KPIs — editable */}
+      {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
-        <EditableKpi {...kpiProps('budget',    budget,    C.textPrimary, 'Presupuesto')} />
-        <EditableKpi {...kpiProps('collected', collected, C.success,     'Cobrado')} />
-        <EditableKpi {...kpiProps('pending',   pending,   C.orange,      'Pendiente')} />
-        <EditableKpi {...kpiProps('egresos',   egresos,   C.danger,      'Egresos')} />
+        <EditableKpi {...kpiProps('budget',  budget,  C.textPrimary, 'Presupuesto')} />
+        {/* Pagado and Pendiente are auto-calculated from EP toggle states */}
+        <StaticKpi label="Pagado"    value={pagadoCalc}    color={C.success} hint="∑ EPs pagados" />
+        <StaticKpi label="Pendiente" value={pendienteCalc} color={C.orange}  hint="∑ EPs pendientes" />
+        <EditableKpi {...kpiProps('egresos', egresos, C.danger,      'Egresos')} />
       </div>
 
-      {/* EPs — editable table */}
+      {/* EPs — editable table with toggle estado */}
       <div style={{ marginBottom: 28 }}>
         <SectionTitle>Estados de Pago ({detail.eps.length})</SectionTitle>
         {detail.eps.length === 0 ? (
           <p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Sin estados de pago registrados.</p>
         ) : (
           <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 380 }}>
               <thead>
                 <tr style={{ background: C.listBg }}>
                   <th style={TH}>Estado de Pago</th>
                   <th style={{ ...TH, textAlign: 'right' }}>Monto</th>
-                  <th style={TH}>Fecha Est.</th>
-                  <th style={TH}>Fecha Real</th>
-                  <th style={{ ...TH, textAlign: 'center' }}>Estado</th>
+                  <th style={{ ...TH, textAlign: 'center', width: 130 }}>Estado</th>
                 </tr>
               </thead>
               <tbody>
                 {detail.eps.map((ep, i) => {
                   const d    = getEp(ep, i)
-                  const paid = !!d.realDate
+                  const paid = isEpPaid(ep, i)
                   return (
                     <tr key={i} style={{ borderTop: i > 0 ? `1px solid ${C.border}` : 'none' }}>
                       <EditableCell value={d.label} color={C.textPrimary}
-                        {...ec({ kind: 'ep', idx: i, col: 'label'    }, d.label)} />
-                      <EditableCell value={d.amount != null ? fmtCLP(d.amount) : ''} align="right" color={C.success}
-                        {...ec({ kind: 'ep', idx: i, col: 'amount'   }, d.amount != null ? String(Math.round(d.amount)) : '')} />
-                      <EditableCell value={fmtDate(d.estDate)} color={C.textSec}
-                        {...ec({ kind: 'ep', idx: i, col: 'estDate'  }, dateToStr(d.estDate))} />
-                      <EditableCell value={fmtDate(d.realDate)} color={paid ? C.success : C.textMuted}
-                        {...ec({ kind: 'ep', idx: i, col: 'realDate' }, dateToStr(d.realDate))} />
+                        {...ec({ kind: 'ep', idx: i, col: 'label'  }, d.label)} />
+                      <EditableCell value={d.amount != null ? fmtCLP(d.amount) : ''} align="right" color={C.textPrimary}
+                        {...ec({ kind: 'ep', idx: i, col: 'amount' }, d.amount != null ? String(Math.round(d.amount)) : '')} />
                       <td style={{ ...TD, textAlign: 'center' }}>
-                        <span style={{
-                          display: 'inline-flex', padding: '2px 8px', borderRadius: 20,
-                          fontSize: 10, fontWeight: 700,
-                          color: paid ? C.success : C.orange,
-                          background: paid ? C.successBg : C.orangeFaint,
-                          border: `1px solid ${paid ? C.successBorder : C.orangeBorder}`,
-                        }}>
-                          {paid ? 'Pagado' : 'Pendiente'}
-                        </span>
+                        <button
+                          onClick={() => toggleEpPaid(i)}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            padding: '5px 14px', borderRadius: 20, cursor: 'pointer',
+                            fontSize: 11, fontWeight: 700, transition: 'all 0.15s',
+                            color: paid ? C.success : C.orange,
+                            background: paid ? C.successBg : C.orangeFaint,
+                            border: `1px solid ${paid ? C.successBorder : C.orangeBorder}`,
+                          }}
+                        >
+                          {paid ? '✓ Pagado' : 'Pendiente'}
+                        </button>
                       </td>
                     </tr>
                   )
@@ -709,16 +721,16 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
               </thead>
               <tbody>
                 {detail.expenses.map((e, i) => {
-                  const ov  = edits.expenses?.[i] ?? {}
-                  const desc  = ov.description  ?? e.description  ?? ''
-                  const net   = ov.amountNet    ?? e.amountNet    ?? null
-                  const gross = ov.amountWithTax ?? e.amountWithTax ?? null
+                  const ov    = edits.expenses?.[i] ?? {}
+                  const desc  = ov.description   ?? e.description   ?? ''
+                  const net   = ov.amountNet      ?? e.amountNet     ?? null
+                  const gross = ov.amountWithTax  ?? e.amountWithTax ?? null
                   return (
                     <tr key={i} style={{ borderTop: `1px solid ${C.border}` }}>
                       <EditableCell value={String(desc)}
-                        {...ec({ kind: 'expense', idx: i, col: 'description'   }, String(desc))} />
+                        {...ec({ kind: 'expense', idx: i, col: 'description'    }, String(desc))} />
                       <EditableCell value={fmtCLP(net)} align="right" color={C.danger}
-                        {...ec({ kind: 'expense', idx: i, col: 'amountNet'     }, net != null ? String(Math.round(net)) : '')} />
+                        {...ec({ kind: 'expense', idx: i, col: 'amountNet'      }, net   != null ? String(Math.round(net))   : '')} />
                       {hasImputaciones && (
                         <EditableCell value={gross != null ? fmtCLP(gross) : ''} align="right" color={C.textSec}
                           {...ec({ kind: 'expense', idx: i, col: 'amountWithTax' }, gross != null ? String(Math.round(gross)) : '')} />
@@ -750,8 +762,8 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
               {([
                 { label: 'Total Egresos',            value: fmtCLP(egresos),   color: C.danger,  bold: false },
                 { label: 'Total Neto Q4 Ingenieros', value: fmtCLP(totalNeto), color: (totalNeto ?? 0) >= 0 ? C.success : C.danger, bold: true },
-                { label: 'Margen de Utilidad',       value: margen != null ? `${(margen * 100).toFixed(1)}%` : '—', color: (margen ?? 0) >= 0 ? C.success : C.danger, bold: true },
-                { label: 'Costo-Venta',              value: costoVenta != null ? `${(costoVenta * 100).toFixed(1)}%` : '—', color: C.textSec, bold: false },
+                { label: 'Margen de Utilidad', value: margen     != null ? `${(margen     * 100).toFixed(1)}%` : '—', color: (margen ?? 0) >= 0 ? C.success : C.danger, bold: true },
+                { label: 'Costo-Venta',        value: costoVenta != null ? `${(costoVenta * 100).toFixed(1)}%` : '—', color: C.textSec, bold: false },
               ] as { label: string; value: string; color: string; bold: boolean }[]).map((row, i) => (
                 <tr key={i} style={{ borderTop: i > 0 ? `1px solid ${C.border}` : 'none', background: i % 2 === 0 ? C.listBg : C.card }}>
                   <td style={{ ...TD, fontWeight: row.bold ? 600 : 400, color: C.textSec, width: '60%' }}>{row.label}</td>
