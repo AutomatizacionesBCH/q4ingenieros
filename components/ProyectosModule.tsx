@@ -328,23 +328,89 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   )
 }
 
-// ─── KPI card ─────────────────────────────────────────────────────────────────
+// ─── Editable KPI ─────────────────────────────────────────────────────────────
 
-function KpiCard({ label, value, color }: { label: string; value: string; color: string }) {
+const PROJ_EDIT_KEY = 'proj_edit_v1'
+interface ProjEdits {
+  budget?:    number
+  collected?: number
+  pending?:   number
+  egresos?:   number
+}
+function loadProjEdits(id: number): ProjEdits {
+  try {
+    const all = JSON.parse(localStorage.getItem(PROJ_EDIT_KEY) ?? '{}') as Record<string, ProjEdits>
+    return all[String(id)] ?? {}
+  } catch { return {} }
+}
+function saveProjEdits(id: number, edits: ProjEdits) {
+  try {
+    const all = JSON.parse(localStorage.getItem(PROJ_EDIT_KEY) ?? '{}') as Record<string, ProjEdits>
+    all[String(id)] = edits
+    localStorage.setItem(PROJ_EDIT_KEY, JSON.stringify(all))
+  } catch {}
+}
+type EditField = 'budget' | 'collected' | 'pending' | 'egresos'
+
+function EditableKpi({
+  label, value, color, isEditing, isOverridden, inputVal,
+  onStartEdit, onInputChange, onCommit, onCancel, onReset,
+}: {
+  label: string; value: number | null; color: string
+  isEditing: boolean; isOverridden: boolean; inputVal: string
+  onStartEdit: (v: number | null) => void
+  onInputChange: (v: string) => void
+  onCommit: () => void; onCancel: () => void; onReset: () => void
+}) {
   return (
-    <div style={{
-      background: C.card, border: `1px solid ${C.border}`,
-      borderRadius: 10, padding: '14px 16px',
-    }}>
+    <div
+      onClick={() => { if (!isEditing) onStartEdit(value) }}
+      style={{
+        background: C.card,
+        border: `1px solid ${isEditing ? C.orange : C.border}`,
+        borderRadius: 10, padding: '14px 16px', cursor: 'pointer',
+        transition: 'border-color 0.1s',
+      }}
+    >
       <div style={{
         fontSize: 9, fontWeight: 700, letterSpacing: '0.09em',
         textTransform: 'uppercase', color: C.textMuted, marginBottom: 8,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
-        {label}
+        <span>{label}</span>
+        {isOverridden && (
+          <span
+            onClick={e => { e.stopPropagation(); onReset() }}
+            title="Restaurar valor original"
+            style={{ cursor: 'pointer', color: C.orange, fontSize: 13, lineHeight: 1 }}
+          >↺</span>
+        )}
       </div>
-      <div style={{ fontSize: 17, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
-        {value}
-      </div>
+      {isEditing ? (
+        <input
+          autoFocus
+          value={inputVal}
+          onChange={e => onInputChange(e.target.value)}
+          onBlur={onCommit}
+          onKeyDown={e => { if (e.key === 'Enter') onCommit(); if (e.key === 'Escape') onCancel() }}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            fontSize: 17, fontWeight: 700, color,
+            fontVariantNumeric: 'tabular-nums',
+            border: 'none', outline: 'none', background: 'transparent',
+            padding: 0, lineHeight: 1,
+          }}
+        />
+      ) : (
+        <>
+          <div style={{ fontSize: 17, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+            {fmtCLP(value)}
+          </div>
+          <div style={{ fontSize: 9, color: C.textMuted, marginTop: 5, opacity: 0.6 }}>
+            ✎ editar
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -385,66 +451,89 @@ function EmptyDetail({ total }: { total: number }) {
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
 
 function DetailPanel({ detail }: { detail: ProjectDetail }) {
-  const totalEgresos    = detail.expenses.reduce((s, e) => s + (e.amountNet ?? 0), 0)
-  const hasImputaciones = detail.expenses.some(e => e.amountWithTax != null)
-  const badge           = getStatusBadge(detail.status ?? '', detail.isFinalized)
-  const marginPositive  = (detail.margin ?? 0) >= 0
+  const totalEgresosCalc = detail.expenses.reduce((s, e) => s + (e.amountNet ?? 0), 0)
+  const hasImputaciones  = detail.expenses.some(e => e.amountWithTax != null)
+
+  const [edits,    setEdits]    = useState<ProjEdits>(() => loadProjEdits(detail.id))
+  const [editing,  setEditing]  = useState<EditField | null>(null)
+  const [inputVal, setInputVal] = useState('')
+
+  useEffect(() => {
+    setEdits(loadProjEdits(detail.id))
+    setEditing(null)
+  }, [detail.id])
+
+  function persist(next: ProjEdits) {
+    setEdits(next)
+    saveProjEdits(detail.id, next)
+  }
+
+  function startEdit(field: EditField, current: number | null) {
+    setEditing(field)
+    setInputVal(current != null ? String(Math.round(current)) : '')
+  }
+
+  function commitEdit() {
+    if (!editing) return
+    const n = Number(inputVal.replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, ''))
+    if (!isNaN(n)) persist({ ...edits, [editing]: n })
+    setEditing(null)
+  }
+
+  function resetField(field: EditField) {
+    const next = { ...edits }
+    delete next[field]
+    persist(next)
+  }
+
+  const budget    = edits.budget    ?? detail.budget?.net    ?? null
+  const collected = edits.collected ?? detail.totalCollected ?? null
+  const pending   = edits.pending   ?? detail.pending        ?? null
+  const egresos   = edits.egresos   ?? (totalEgresosCalc || null)
+
+  // Analysis
+  const totalNeto  = budget != null && egresos != null ? budget - egresos : null
+  const margen     = budget != null && budget > 0 && totalNeto  != null ? totalNeto  / budget : null
+  const costoVenta = budget != null && budget > 0 && egresos    != null ? egresos    / budget : null
+
+  const kpiProps = (field: EditField, value: number | null, color: string, label: string) => ({
+    label, value, color,
+    isEditing:     editing === field,
+    isOverridden:  edits[field] != null,
+    inputVal:      editing === field ? inputVal : '',
+    onStartEdit:   (v: number | null) => startEdit(field, v),
+    onInputChange: setInputVal,
+    onCommit:      commitEdit,
+    onCancel:      () => setEditing(null),
+    onReset:       () => resetField(field),
+  })
 
   return (
     <div style={{ padding: '28px 32px 40px', maxWidth: 900 }}>
-      {/* Header */}
+
+      {/* Header — no status badge */}
       <div style={{ paddingBottom: 20, marginBottom: 24, borderBottom: `1px solid ${C.border}` }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontFamily: 'monospace', fontSize: 12, color: C.textMuted, marginBottom: 6 }}>
-              #{detail.id}
-            </div>
-            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.textPrimary, lineHeight: 1.3 }}>
-              {detail.name}
-            </h2>
-            <div style={{ fontSize: 14, color: C.textSec, marginTop: 6 }}>{detail.client}</div>
-          </div>
-          <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-            <span style={{
-              display: 'inline-flex', padding: '4px 12px', borderRadius: 20,
-              fontSize: 11, fontWeight: 600,
-              color: badge.color, background: badge.bg,
-              border: `1px solid ${badge.border}`,
-              whiteSpace: 'nowrap',
-            }}>
-              {badge.label}
-            </span>
-            {(detail.scope || detail.managementType) && (
-              <span style={{ fontSize: 12, color: C.textMuted }}>
-                {[detail.scope, gestionLabel(detail.managementType)].filter(Boolean).join(' · ')}
-              </span>
-            )}
-          </div>
+        <div style={{ fontFamily: 'monospace', fontSize: 12, color: C.textMuted, marginBottom: 6 }}>
+          #{detail.id}
         </div>
+        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.textPrimary, lineHeight: 1.3 }}>
+          {detail.name}
+        </h2>
+        <div style={{ fontSize: 14, color: C.textSec, marginTop: 6 }}>{detail.client}</div>
+        {(detail.scope || detail.managementType) && (
+          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>
+            {[detail.scope, gestionLabel(detail.managementType)].filter(Boolean).join(' · ')}
+          </div>
+        )}
       </div>
 
-      {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
-        <KpiCard label="Presupuesto" value={fmtCLP(detail.budget?.net ?? null)} color={C.textPrimary} />
-        <KpiCard label="Cobrado"     value={fmtCLP(detail.totalCollected)}       color={C.success} />
-        <KpiCard label="Pendiente"   value={fmtCLP(detail.pending)}              color={C.orange} />
-        <KpiCard label="Egresos"     value={fmtCLP(totalEgresos || null)}        color={C.danger} />
+      {/* KPIs — editable */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
+        <EditableKpi {...kpiProps('budget',    budget,    C.textPrimary, 'Presupuesto')} />
+        <EditableKpi {...kpiProps('collected', collected, C.success,     'Cobrado')} />
+        <EditableKpi {...kpiProps('pending',   pending,   C.orange,      'Pendiente')} />
+        <EditableKpi {...kpiProps('egresos',   egresos,   C.danger,      'Egresos')} />
       </div>
-
-      {/* Margin */}
-      {detail.margin != null && (
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 16px', borderRadius: 8, marginBottom: 28,
-          background: marginPositive ? C.successBg : C.dangerBg,
-          border: `1px solid ${marginPositive ? C.successBorder : C.dangerBorder}`,
-        }}>
-          <span style={{ fontSize: 13, color: C.textSec }}>Margen de utilidad</span>
-          <span style={{ fontSize: 18, fontWeight: 700, color: marginPositive ? C.success : C.danger }}>
-            {Math.round(detail.margin * 100)}%
-          </span>
-        </div>
-      )}
 
       {/* EPs */}
       <div style={{ marginBottom: 28 }}>
@@ -452,7 +541,7 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
         <EPTrackerExpanded eps={detail.eps} />
       </div>
 
-      {/* Egresos */}
+      {/* Egresos table */}
       {detail.expenses.length > 0 && (
         <div style={{ marginBottom: 28 }}>
           <SectionTitle>Egresos ({detail.expenses.length})</SectionTitle>
@@ -484,7 +573,7 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
                 <tr style={{ background: C.listBg, borderTop: `2px solid ${C.border}` }}>
                   <td style={{ ...TD, fontWeight: 700 }}>Total</td>
                   <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: C.danger, fontVariantNumeric: 'tabular-nums' }}>
-                    {fmtCLP(totalEgresos)}
+                    {fmtCLP(totalEgresosCalc)}
                   </td>
                   {hasImputaciones && <td style={TD} />}
                 </tr>
@@ -493,6 +582,63 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
           </div>
         </div>
       )}
+
+      {/* Analysis table */}
+      <div style={{ marginBottom: 28 }}>
+        <SectionTitle>Análisis</SectionTitle>
+        <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <tbody>
+              {([
+                {
+                  label: 'Total Egresos',
+                  value: fmtCLP(egresos),
+                  color: C.danger,
+                  bold:  false,
+                },
+                {
+                  label: 'Total Neto Q4 Ingenieros',
+                  value: fmtCLP(totalNeto),
+                  color: (totalNeto ?? 0) >= 0 ? C.success : C.danger,
+                  bold:  true,
+                },
+                {
+                  label: 'Margen de Utilidad',
+                  value: margen != null ? `${(margen * 100).toFixed(1)}%` : '—',
+                  color: (margen ?? 0) >= 0 ? C.success : C.danger,
+                  bold:  true,
+                },
+                {
+                  label: 'Costo-Venta',
+                  value: costoVenta != null ? `${(costoVenta * 100).toFixed(1)}%` : '—',
+                  color: C.textSec,
+                  bold:  false,
+                },
+              ] as { label: string; value: string; color: string; bold: boolean }[]).map((row, i) => (
+                <tr
+                  key={i}
+                  style={{
+                    borderTop: i > 0 ? `1px solid ${C.border}` : 'none',
+                    background: i % 2 === 0 ? C.listBg : C.card,
+                  }}
+                >
+                  <td style={{ ...TD, fontWeight: row.bold ? 600 : 400, color: C.textSec, width: '60%' }}>
+                    {row.label}
+                  </td>
+                  <td style={{
+                    ...TD, textAlign: 'right',
+                    fontWeight: row.bold ? 700 : 500,
+                    color: row.color,
+                    fontVariantNumeric: 'tabular-nums',
+                  }}>
+                    {row.value}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Observations */}
       {detail.observations && (
