@@ -34,10 +34,11 @@ export interface EP {
 
 export interface Expense {
   description: string
-  /** For pre-210 sheets: single amount */
   amountNet: number | null
-  /** For 210+ sheets: separate column exists */
   amountWithTax: number | null
+  /** true for subtotal/category-header rows in hierarchical sheets (210+).
+   *  e.g. ESTRUCTURAL, ETAPA 1, ARQUITECTURA — not counted in leaf totals. */
+  isSection: boolean
 }
 
 export interface ProjectBudget {

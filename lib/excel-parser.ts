@@ -155,6 +155,40 @@ function parseResumen(workbook: XLSX.WorkBook): ProjectSummary[] {
   return summaries
 }
 
+// ─── Expense section detector ────────────────────────────────────────────────
+//
+// Projects 210+ use a hierarchical layout where some rows are section headers
+// or subtotals (ESTRUCTURAL, ETAPA 1 …) whose amount equals the sum of the
+// immediately following leaf rows.  We detect these in two ways:
+//   1. Rows with no amount  → pure category header (e.g. ARQUITECTURA)
+//   2. Rows whose amount equals the sum of ≥2 following rows → subtotal header
+
+function detectExpenseSections(
+  raw: Array<{ description: string; amountNet: number | null; amountWithTax: number | null }>,
+): Expense[] {
+  return raw.map((exp, i) => {
+    // No amount → pure section header
+    if (exp.amountNet === null) return { ...exp, isSection: true }
+
+    // Check whether this amount equals the sum of ≥2 immediately following rows
+    let cumSum = 0
+    let count  = 0
+    for (let j = i + 1; j < raw.length; j++) {
+      const next = raw[j]
+      if (next.amountNet === null)           break // hit a pure header — end of group
+      if (next.amountNet > exp.amountNet)    break // next section header is larger
+      cumSum += next.amountNet
+      count++
+      if (Math.abs(cumSum - exp.amountNet) < 1 && count >= 2) {
+        return { ...exp, isSection: true }
+      }
+      if (cumSum > exp.amountNet)            break // overshot
+    }
+
+    return { ...exp, isSection: false }
+  })
+}
+
 // ─── Project sheet parser ─────────────────────────────────────────────────────
 
 function parseProjectSheet(
@@ -356,6 +390,9 @@ function parseProjectSheet(
   let ingresosFinished = false
   let egresosFinished = false
 
+  // Raw expense rows — section detection runs after the loop
+  const rawExpenses: Array<{ description: string; amountNet: number | null; amountWithTax: number | null }> = []
+
   for (let i = dataStart; i < rows.length; i++) {
     // Exit early when both sides are done
     if (ingresosFinished && egresosFinished) break
@@ -452,12 +489,15 @@ function parseProjectSheet(
           continue
         }
 
-        // Skip sub-header labels
+        // Skip column-header / control labels
         if (
           expDescLower.includes('egreso') ||
           expDescLower.includes('monto') ||
           expDescLower.includes('estimat') ||
-          expDescLower.includes('descripci')
+          expDescLower.includes('descripci') ||
+          expDescLower.includes('proveedor') ||
+          expDescLower.includes('fecha') ||
+          expDescLower.includes(' rut')
         ) continue
 
         const amountNet = toNum(row[expNetCol])
@@ -465,17 +505,20 @@ function parseProjectSheet(
           ? toNum(row[expWithTaxCol])
           : null
 
-        if (amountNet !== null || amountWithTax !== null) {
-          const expense: Expense = {
-            description: expDesc,
-            amountNet,
-            amountWithTax,
-          }
-          result.expenses.push(expense)
+        // Always collect when there is an amount; for new-structure sheets also
+        // collect null-amount rows — they are category headers (e.g. ARQUITECTURA)
+        if (amountNet !== null || amountWithTax !== null || isNewStructure) {
+          rawExpenses.push({ description: expDesc, amountNet, amountWithTax })
         }
       }
     }
   }
+
+  // Post-process expenses: run hierarchical section detection for new-structure
+  // sheets (210+). Old-structure projects get isSection:false for everything.
+  result.expenses = isNewStructure
+    ? detectExpenseSections(rawExpenses)
+    : rawExpenses.map(e => ({ ...e, isSection: false }))
 
   return result
 }

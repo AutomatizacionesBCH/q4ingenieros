@@ -527,7 +527,10 @@ function StaticKpi({ label, value, color, hint }: { label: string; value: number
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
 
 function DetailPanel({ detail }: { detail: ProjectDetail }) {
-  const totalEgresosCalc = detail.expenses.reduce((s, e) => s + (e.amountNet ?? 0), 0)
+  // Only sum leaf items — section/subtotal rows are excluded to avoid double-counting
+  const totalEgresosCalc = detail.expenses
+    .filter(e => !e.isSection)
+    .reduce((s, e) => s + (e.amountNet ?? 0), 0)
 
   const [edits,    setEdits]    = useState<ProjEdits>(() => loadProjEdits(detail.id))
   const [active,   setActive]   = useState<ActiveEdit>(null)
@@ -627,8 +630,9 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
   const marginShow  = detail.margin  ?? (budget != null && budget > 0 && utilityShow != null ? utilityShow / budget : null)
   const costoVenta  = budget != null && budget > 0 && egresos != null ? egresos / budget : null
 
-  // Total Con Impuesto para el pie de la tabla de Egresos
+  // Total Con Impuesto — leaf rows only (skip section headers)
   const totalWithTax = detail.expenses.reduce((sum, e, i) => {
+    if (e.isSection) return sum
     const ov   = edits.expenses?.[i] ?? {}
     const net  = ov.amountNet ?? e.amountNet ?? null
     const tipo = ov.tipo ?? null
@@ -637,7 +641,7 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
     }
     return sum
   }, 0)
-  const hasExpTipos = detail.expenses.some((_, i) => (edits.expenses?.[i]?.tipo) != null)
+  const hasExpTipos = detail.expenses.some((e, i) => !e.isSection && (edits.expenses?.[i]?.tipo) != null)
 
   const kpiProps = (field: EditField, value: number | null, color: string, label: string) => ({
     label, value, color,
@@ -740,6 +744,37 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
               </thead>
               <tbody>
                 {detail.expenses.map((e, i) => {
+                  // ── Section / category header row ─────────────────────────
+                  if (e.isSection) {
+                    return (
+                      <tr key={i} style={{ background: C.listBg, borderTop: `1px solid ${C.border}` }}>
+                        <td
+                          colSpan={e.amountNet !== null ? 1 : 4}
+                          style={{
+                            ...TD, fontWeight: 700, fontSize: 11,
+                            color: C.textPrimary, letterSpacing: '0.05em',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          {e.description}
+                        </td>
+                        {e.amountNet !== null && (
+                          <>
+                            <td style={{
+                              ...TD, textAlign: 'right', fontWeight: 700,
+                              color: C.textSec, fontVariantNumeric: 'tabular-nums',
+                            }}>
+                              {fmtCLP(e.amountNet)}
+                            </td>
+                            <td style={TD} />
+                            <td style={TD} />
+                          </>
+                        )}
+                      </tr>
+                    )
+                  }
+
+                  // ── Leaf expense row ──────────────────────────────────────
                   const ov   = edits.expenses?.[i] ?? {}
                   const desc = ov.description ?? e.description ?? ''
                   const net  = ov.amountNet   ?? e.amountNet   ?? null
