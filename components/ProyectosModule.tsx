@@ -335,7 +335,7 @@ interface ProjEdits {
   budget?:       number
   egresos?:      number
   eps?:          Record<number, { label?: string; amount?: number; paid?: boolean }>
-  expenses?:     Record<number, { description?: string; amountNet?: number; amountWithTax?: number }>
+  expenses?:     Record<number, { description?: string; amountNet?: number; tipo?: 'boleta' | 'factura' }>
   observations?: string
 }
 function loadProjEdits(id: number): ProjEdits {
@@ -421,7 +421,7 @@ function EditableKpi({
 type ActiveEdit =
   | { kind: 'kpi';     field: EditField }
   | { kind: 'ep';      idx: number; col: 'label' | 'amount' }
-  | { kind: 'expense'; idx: number; col: 'description' | 'amountNet' | 'amountWithTax' }
+  | { kind: 'expense'; idx: number; col: 'description' | 'amountNet' }
   | { kind: 'obs' }
   | null
 
@@ -528,7 +528,6 @@ function StaticKpi({ label, value, color, hint }: { label: string; value: number
 
 function DetailPanel({ detail }: { detail: ProjectDetail }) {
   const totalEgresosCalc = detail.expenses.reduce((s, e) => s + (e.amountNet ?? 0), 0)
-  const hasImputaciones  = detail.expenses.some(e => e.amountWithTax != null)
 
   const [edits,    setEdits]    = useState<ProjEdits>(() => loadProjEdits(detail.id))
   const [active,   setActive]   = useState<ActiveEdit>(null)
@@ -577,7 +576,6 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
       const cur = { ...(expEdits[active.idx] ?? {}) }
       if      (active.col === 'description') { cur.description  = inputVal || undefined }
       else if (active.col === 'amountNet')   { const n = toNum(inputVal); if (!isNaN(n)) cur.amountNet = n }
-      else                                   { const n = toNum(inputVal); if (!isNaN(n)) cur.amountWithTax = n }
       expEdits[active.idx] = cur
       persist({ ...edits, expenses: expEdits })
 
@@ -600,6 +598,13 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
     const epEdits = { ...(edits.eps ?? {}) }
     epEdits[idx] = { ...(epEdits[idx] ?? {}), paid: !cur }
     persist({ ...edits, eps: epEdits })
+  }
+  function setExpTipo(idx: number, tipo: 'boleta' | 'factura' | null) {
+    const expEdits = { ...(edits.expenses ?? {}) }
+    const cur = { ...(expEdits[idx] ?? {}) }
+    if (tipo == null) { delete cur.tipo } else { cur.tipo = tipo }
+    expEdits[idx] = cur
+    persist({ ...edits, expenses: expEdits })
   }
   function getEp(ep: EP, idx: number) {
     const ov = edits.eps?.[idx] ?? {}
@@ -716,25 +721,61 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
                 <tr style={{ background: C.listBg }}>
                   <th style={TH}>Descripción</th>
                   <th style={{ ...TH, textAlign: 'right' }}>Monto Neto</th>
-                  {hasImputaciones && <th style={{ ...TH, textAlign: 'right' }}>Con Impuesto</th>}
+                  <th style={{ ...TH, textAlign: 'center', width: 150 }}>Tipo</th>
+                  <th style={{ ...TH, textAlign: 'right' }}>Con Impuesto</th>
                 </tr>
               </thead>
               <tbody>
                 {detail.expenses.map((e, i) => {
-                  const ov    = edits.expenses?.[i] ?? {}
-                  const desc  = ov.description   ?? e.description   ?? ''
-                  const net   = ov.amountNet      ?? e.amountNet     ?? null
-                  const gross = ov.amountWithTax  ?? e.amountWithTax ?? null
+                  const ov   = edits.expenses?.[i] ?? {}
+                  const desc = ov.description ?? e.description ?? ''
+                  const net  = ov.amountNet   ?? e.amountNet   ?? null
+                  const tipo = ov.tipo ?? null
+                  const withTax = net != null && tipo != null
+                    ? Math.round(net * (tipo === 'factura' ? 1.19 : 1.153))
+                    : null
                   return (
                     <tr key={i} style={{ borderTop: `1px solid ${C.border}` }}>
                       <EditableCell value={String(desc)}
-                        {...ec({ kind: 'expense', idx: i, col: 'description'    }, String(desc))} />
+                        {...ec({ kind: 'expense', idx: i, col: 'description' }, String(desc))} />
                       <EditableCell value={fmtCLP(net)} align="right" color={C.danger}
-                        {...ec({ kind: 'expense', idx: i, col: 'amountNet'      }, net   != null ? String(Math.round(net))   : '')} />
-                      {hasImputaciones && (
-                        <EditableCell value={gross != null ? fmtCLP(gross) : ''} align="right" color={C.textSec}
-                          {...ec({ kind: 'expense', idx: i, col: 'amountWithTax' }, gross != null ? String(Math.round(gross)) : '')} />
-                      )}
+                        {...ec({ kind: 'expense', idx: i, col: 'amountNet' }, net != null ? String(Math.round(net)) : '')} />
+                      <td style={{ ...TD, textAlign: 'center' }}>
+                        <div style={{
+                          display: 'inline-flex', borderRadius: 20, overflow: 'hidden',
+                          border: `1px solid ${C.border}`,
+                        }}>
+                          {(['factura', 'boleta'] as const).map(t => (
+                            <button
+                              key={t}
+                              onClick={() => setExpTipo(i, tipo === t ? null : t)}
+                              style={{
+                                padding: '4px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                                border: 'none', outline: 'none',
+                                color: tipo === t ? '#fff' : C.textMuted,
+                                background: tipo === t
+                                  ? (t === 'factura' ? '#1C2D5A' : C.textSec)
+                                  : 'transparent',
+                                transition: 'all 0.12s',
+                              }}
+                            >
+                              {t === 'factura' ? 'Factura' : 'Boleta'}
+                            </button>
+                          ))}
+                        </div>
+                      </td>
+                      <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                        {withTax != null ? (
+                          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 5 }}>
+                            <span style={{ color: C.textSec }}>{fmtCLP(withTax)}</span>
+                            <span style={{ fontSize: 9, color: C.textMuted, opacity: 0.6 }}>
+                              ×{tipo === 'factura' ? '1.19' : '1.153'}
+                            </span>
+                          </span>
+                        ) : (
+                          <span style={{ color: C.textMuted }}>—</span>
+                        )}
+                      </td>
                     </tr>
                   )
                 })}
@@ -745,7 +786,8 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
                   <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: C.danger, fontVariantNumeric: 'tabular-nums' }}>
                     {fmtCLP(totalEgresosCalc)}
                   </td>
-                  {hasImputaciones && <td style={TD} />}
+                  <td style={TD} />
+                  <td style={TD} />
                 </tr>
               </tfoot>
             </table>
