@@ -283,38 +283,70 @@ function parseProjectSheet(
     }
   }
 
-  // ── Resolve actual description columns ────────────────────────────────────
+  // ── Resolve INGRESOS description column ──────────────────────────────────
   //
-  // In ALL known project sheets, the "INGRESOS" and "EGRESOS" section labels
-  // are placed in the AMOUNT column (not the description column). The actual
-  // description text (EP label / expense name) is ONE column to the LEFT.
+  // "INGRESOS" header is always placed in the MONTO column (same column as
+  // the EP amounts). EP label text lives one column to the left.
   //
-  //  col 1: EP description   ← incDescCol
-  //  col 2: INGRESOS / MONTO ← ingresosCol = incMontoCol
-  //  col 3: FECHA ESTIMATIVA
-  //  col 4: FECHA REAL
-  //  col 5: EGRESOS desc     ← expDescCol
-  //  col 6: EGRESOS / MONTO  ← egresosCol = expNetCol (or MONTO NETO for 210+)
-  //  col 7: CON IMPUESTO     ← expWithTaxCol (new structure only)
+  //  col 1 : EP description  ← incDescCol
+  //  col 2 : INGRESOS/MONTO  ← ingresosCol = incMontoCol
+  //  col 3 : FECHA ESTIMATIVA
+  //  col 4 : FECHA REAL
 
-  // INGRESOS description column
   let incDescCol = ingresosCol
   if (incMontoCol === ingresosCol && ingresosCol > 0) {
     incDescCol = ingresosCol - 1
   }
 
-  // EGRESOS description and net columns
-  if (egresosCol > 0 && egresosCol < subHeader.length) {
-    const egSubHdr = toStr(subHeader[egresosCol]).toUpperCase()
-    if (egSubHdr.includes('MONTO')) {
-      // EGRESOS header sits on the amount column; description is one to the left
-      expDescCol = egresosCol - 1
-      if (!isNewStructure) {
-        // Old structure: net amount IS the egresosCol (plain "MONTO")
-        expNetCol = egresosCol
+  // ── Resolve EGRESOS description / amount columns (data-driven) ────────────
+  //
+  // Two observed layouts:
+  //
+  //   Layout A (classic, projects 1-209):
+  //     col N-1 : expense description  ← expDescCol
+  //     col N   : EGRESOS/MONTO        ← egresosCol = expNetCol
+  //
+  //   Layout B (projects 210+, e.g. #229):
+  //     col N   : EGRESOS header + descriptions ← egresosCol = expDescCol
+  //     col N+1 : MONTO amounts                 ← expNetCol
+  //
+  // We distinguish them by probing the first data rows: if col egresosCol-1
+  // contains non-numeric text → Layout A (description is to the left).
+  // Otherwise → Layout B (description is at egresosCol itself).
+
+  if (!isNewStructure && egresosCol > 0) {
+    const probeStart = ingresosRow + 2  // same as dataStart, computed ahead
+    let descAtLeft = false
+    for (let pi = probeStart; pi < Math.min(probeStart + 4, rows.length); pi++) {
+      const pr = rows[pi] as unknown[]
+      const leftCell = pr[egresosCol - 1]
+      const leftStr  = toStr(leftCell)
+      if (leftStr && toNum(leftCell) === null) {
+        // Non-numeric text at egresosCol-1 ⟹ that is the description column
+        descAtLeft = true
+        break
       }
-      // New structure: expNetCol was already set to egresosCol by the scan above ✓
     }
+    if (descAtLeft) {
+      // Layout A: header sits at MONTO col, descriptions one step left
+      expDescCol = egresosCol - 1
+      expNetCol  = egresosCol
+    }
+    // else Layout B: expDescCol = egresosCol, expNetCol = egresosCol + 1 (already set)
+  }
+
+  if (isNewStructure && egresosCol > 0) {
+    // New-structure sheets: description is one column before the MONTO NETO
+    // column that was found during the sub-header scan.
+    // If the EGRESOS header cell itself has a "MONTO"-like label, the header
+    // is at the amount col and description is one to the left.
+    if (egresosCol < subHeader.length) {
+      const egSubHdr = toStr(subHeader[egresosCol]).toUpperCase()
+      if (egSubHdr.includes('MONTO')) {
+        expDescCol = egresosCol - 1
+      }
+    }
+    // expNetCol was already set to the MONTO NETO column by the scan above ✓
   }
 
   // ── 5. Parse data rows (EPs + Expenses simultaneously) ──────────────────
