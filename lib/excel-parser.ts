@@ -170,10 +170,15 @@ function detectExpenseSections(
     // No amount → pure category header (e.g. ARQUITECTURA)
     if (exp.amountNet === null) return { ...exp, isSection: true }
 
-    // Rows whose description contains "N°" are always numbered leaf items
-    // (EP N°1, BH N°2 …) — never section headers, even if a coincidental
-    // sum of following rows happens to equal this row's amount.
+    // Rows with "N°" notation are always numbered leaf items (EP N°1, BH N°2 …)
     if (/n[°o]\d/i.test(exp.description)) return { ...exp, isSection: false }
+
+    // Only ALL_CAPS descriptions can be subtotal/section headers.
+    // Mixed-case names (Topografía, Mecánica de Suelos) are always leaf items,
+    // even if their amount coincidentally equals the sum of following rows.
+    const descTrimmed = exp.description.trim()
+    const isAllCaps   = descTrimmed === descTrimmed.toUpperCase() && /[A-ZÁÉÍÓÚÑÜ]/.test(descTrimmed)
+    if (!isAllCaps) return { ...exp, isSection: false }
 
     // Check whether this amount equals the sum of ≥2 immediately following rows.
     // Identifies subtotal headers: ESTRUCTURAL, ETAPA 1, ETAPA 2 …
@@ -511,20 +516,22 @@ function parseProjectSheet(
           ? toNum(row[expWithTaxCol])
           : null
 
-        // Always collect when there is an amount; for new-structure sheets also
-        // collect null-amount rows — they are category headers (e.g. ARQUITECTURA)
-        if (amountNet !== null || amountWithTax !== null || isNewStructure) {
+        // Collect rows with an amount always.
+        // Also collect null-amount rows whose description is ALL_CAPS — these are
+        // pure category headers like ARQUITECTURA, regardless of isNewStructure.
+        const descTrimmed   = expDesc.trim()
+        const isAllCapsDesc = descTrimmed === descTrimmed.toUpperCase() && /[A-ZÁÉÍÓÚÑÜ]/.test(descTrimmed)
+        if (amountNet !== null || amountWithTax !== null || isAllCapsDesc) {
           rawExpenses.push({ description: expDesc, amountNet, amountWithTax })
         }
       }
     }
   }
 
-  // Post-process expenses: run hierarchical section detection for new-structure
-  // sheets (210+). Old-structure projects get isSection:false for everything.
-  result.expenses = isNewStructure
-    ? detectExpenseSections(rawExpenses)
-    : rawExpenses.map(e => ({ ...e, isSection: false }))
+  // Post-process: detect hierarchical sections in all projects.
+  // The ALL_CAPS guard inside detectExpenseSections prevents false positives
+  // for old-structure projects (Topografía, Mecánica de Suelos are mixed-case).
+  result.expenses = detectExpenseSections(rawExpenses)
 
   return result
 }
