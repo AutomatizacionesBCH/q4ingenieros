@@ -30,8 +30,9 @@ export interface MonthDetail {
   facturadoItems: ProjectEntry[]
   facturadoTotal: number | null
   // Box 2: Ingreso recibido
-  ingresoPrivado: number | null
-  ingresoPublico: number | null
+  ingresoItems: ProjectEntry[]      // individual ingreso entries
+  ingresoPrivado: number | null     // subtotal from PRIVADOS RECIBIDOS row
+  ingresoPublico: number | null     // subtotal from PÚBLICO RECIBIDO row
   ingresoTotal: number | null
   // Box 3: Resumen
   resumenFacturado: number | null
@@ -197,11 +198,12 @@ function parseCursado(workbook: XLSX.WorkBook): {
   let publicoFacturadoNoPagadoRow  = -1  // "TOTAL FACTURADO NO PAGADO" col0
   let privadoBoletasTotalRow       = -1  // "TOTAL BOLETAS CURSADAS" col3
   let facturadoTotalRow            = -1  // col6 = "TOTAL" (row 29)
-  let ingresoPrivadoRow            = -1  // col6 = "PRIVADOS RECIBIDOS"
-  let ingresoPublicoRow            = -1  // col6 = "PÚBLICO RECIBIDO"
-  let ingresoTotalRow              = -1  // col6 = "TOTAL INGRESOS"
-  let resumenIngresoCajaRow        = -1  // col6 = "TOTAL INGRESO (CAJA)"
-  let resumenFacturadoRow          = -1  // col6 = "TOTAL FACTURADO"
+  let ingresoHeaderRow             = -1  // col6 = "INGRESO RECIBIDO ENERO 2026" (row 36)
+  let ingresoPrivadoRow            = -1  // col6 = "PRIVADOS RECIBIDOS" (row 50)
+  let ingresoPublicoRow            = -1  // col6 = "PÚBLICO RECIBIDO" (row 51)
+  let ingresoTotalRow              = -1  // col6 = "TOTAL INGRESOS" (row 54)
+  let resumenIngresoCajaRow        = -1  // col6 = "TOTAL INGRESO (CAJA)" (row 58)
+  let resumenFacturadoRow          = -1  // col6 = "TOTAL FACTURADO" (row 59)
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i] as unknown[]
@@ -218,6 +220,8 @@ function parseCursado(workbook: XLSX.WorkBook): {
 
     if (c6 === 'TOTAL')
       facturadoTotalRow = i
+    if (c6.includes('INGRESO RECIBIDO') && !c6.includes('PRIVADOS') && !c6.includes('TOTAL'))
+      ingresoHeaderRow = i
     if (c6.includes('PRIVADOS RECIBIDOS'))
       ingresoPrivadoRow = i
     if (c6.includes('PÚBLICO RECIBIDO') || c6.includes('PUBLICO RECIBIDO'))
@@ -273,6 +277,20 @@ function parseCursado(workbook: XLSX.WorkBook): {
 
     const facturadoTotal = facturadoTotalRow >= 0
       ? toNum((rows[facturadoTotalRow] as unknown[])[amountCol]) : null
+
+    // Ingreso items (rows ingresoHeaderRow+2 → ingresoPrivadoRow-1)
+    const ingresoItems: ProjectEntry[] = []
+    if (ingresoHeaderRow >= 0 && ingresoPrivadoRow > ingresoHeaderRow) {
+      for (let i = ingresoHeaderRow + 2; i < ingresoPrivadoRow; i++) {
+        const r = rows[i] as unknown[]
+        const desc = toStr(r[descCol])
+        const amount = toNum(r[amountCol])
+        if (desc && amount !== null && amount !== 0) {
+          ingresoItems.push({ project: desc, amount })
+        }
+      }
+    }
+
     const ingresoPrivado = ingresoPrivadoRow >= 0
       ? toNum((rows[ingresoPrivadoRow] as unknown[])[amountCol]) : null
     const ingresoPublico = ingresoPublicoRow >= 0
@@ -290,6 +308,7 @@ function parseCursado(workbook: XLSX.WorkBook): {
         mes,
         facturadoItems,
         facturadoTotal,
+        ingresoItems,
         ingresoPrivado,
         ingresoPublico,
         ingresoTotal,
