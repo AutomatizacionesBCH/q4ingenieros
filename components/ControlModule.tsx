@@ -621,6 +621,19 @@ export function ControlModule({ data }: { data: ControlData }) {
   const existingMesNames = data.months.map(m => m.mes)
   const allMesNames = [...existingMesNames, ...extraMonths]
 
+  // Derivar resumen desde CURSADO-INGRESADO (más fiable que hoja RESUMEN para meses en curso)
+  const summaryFromMonths = data.months.map(m => ({
+    mes: m.mes,
+    facturado: m.resumenFacturado,
+    ingreso:   m.resumenIngresoCaja,
+  }))
+  const totalsFromMonths = {
+    facturado: summaryFromMonths.some(m => m.facturado !== null)
+      ? summaryFromMonths.reduce((s, m) => s + (m.facturado ?? 0), 0) : null,
+    ingreso:   summaryFromMonths.some(m => m.ingreso !== null)
+      ? summaryFromMonths.reduce((s, m) => s + (m.ingreso ?? 0), 0) : null,
+  }
+
   return (
     <div style={{ height: '100vh', overflowY: 'auto', background: C.canvas }}>
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 24px 48px' }}>
@@ -633,7 +646,7 @@ export function ControlModule({ data }: { data: ControlData }) {
           )}
         </div>
 
-        {data.summary.length > 0 && <SummaryTable summary={data.summary} totals={data.totals} />}
+        {summaryFromMonths.length > 0 && <SummaryTable summary={summaryFromMonths} totals={totalsFromMonths} />}
 
         {/* Section label */}
         {(data.months.length > 0 || extraMonths.length > 0) && (
