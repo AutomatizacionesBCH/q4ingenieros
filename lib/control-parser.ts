@@ -18,6 +18,19 @@ export interface ProjectEntry {
 
 export type TipoIngreso = 'Público' | 'Privado'
 
+export type TipoPendiente = 'noFac' | 'facNoCob' | 'boletas'
+
+export interface PendienteItem {
+  project: string
+  amount: number
+  tipo: TipoPendiente
+}
+
+export interface PendienteDetail {
+  publicoItems: PendienteItem[]
+  privadoItems: PendienteItem[]
+}
+
 export interface IngresoEntry {
   project: string
   amount: number
@@ -62,6 +75,7 @@ export interface PendienteSummary {
 export interface ControlData {
   lastUpdate: string | null
   pendiente: PendienteSummary
+  pendienteDetail: PendienteDetail
   summary: MonthSummary[]
   totals: { facturado: number | null; ingreso: number | null }
   months: MonthDetail[]
@@ -217,6 +231,7 @@ const MONTH_COLS = [
 
 function parseCursado(workbook: XLSX.WorkBook): {
   pendiente: PendienteSummary
+  pendienteDetail: PendienteDetail
   months: MonthDetail[]
 } {
   const sheetName = workbook.SheetNames.find(
@@ -226,10 +241,11 @@ function parseCursado(workbook: XLSX.WorkBook): {
     publicoNoFacturado: null, publicoFacturadoNoCobrado: null, publicoTotal: null,
     privadoNoFacturado: null, privadoBoletasPorCursar: null, privadoTotal: null,
   }
-  if (!sheetName) return { pendiente: defaultPendiente, months: [] }
+  const defaultDetail: PendienteDetail = { publicoItems: [], privadoItems: [] }
+  if (!sheetName) return { pendiente: defaultPendiente, pendienteDetail: defaultDetail, months: [] }
 
   const ws = workbook.Sheets[sheetName]
-  if (!ws) return { pendiente: defaultPendiente, months: [] }
+  if (!ws) return { pendiente: defaultPendiente, pendienteDetail: defaultDetail, months: [] }
 
   const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null })
 
@@ -299,6 +315,46 @@ function parseCursado(workbook: XLSX.WorkBook): {
         : null,
   }
 
+  // ── Pendiente detail items ────────────────────────────────────────────────
+  const publicoItems: PendienteItem[] = []
+  const privadoItems: PendienteItem[] = []
+
+  // No Facturado section: rows 2..publicoNoFacturadoTotalRow-1 (cols 0-1 pub, 3-4 priv)
+  if (publicoNoFacturadoTotalRow > 2) {
+    for (let i = 2; i < publicoNoFacturadoTotalRow; i++) {
+      const r = rows[i] as unknown[]
+      const pubName = toStr(r[0])
+      const pubAmt  = toNum(r[1])
+      if (pubName && pubAmt !== null && pubAmt !== 0) {
+        publicoItems.push({ project: pubName, amount: pubAmt, tipo: 'noFac' })
+      }
+      const privName = toStr(r[3])
+      const privAmt  = toNum(r[4])
+      if (privName && privAmt !== null && privAmt !== 0) {
+        privadoItems.push({ project: privName, amount: privAmt, tipo: 'noFac' })
+      }
+    }
+  }
+
+  // Facturado/No Cobrado (pub) and Boletas (priv): rows publicoNoFacturadoTotalRow+1..publicoFacturadoNoPagadoRow-1
+  if (publicoNoFacturadoTotalRow >= 0 && publicoFacturadoNoPagadoRow > publicoNoFacturadoTotalRow) {
+    for (let i = publicoNoFacturadoTotalRow + 1; i < publicoFacturadoNoPagadoRow; i++) {
+      const r = rows[i] as unknown[]
+      const pubName = toStr(r[0])
+      const pubAmt  = toNum(r[1])
+      if (pubName && pubAmt !== null && pubAmt !== 0) {
+        publicoItems.push({ project: pubName, amount: pubAmt, tipo: 'facNoCob' })
+      }
+      const privName = toStr(r[3])
+      const privAmt  = toNum(r[4])
+      if (privName && privAmt !== null && privAmt !== 0) {
+        privadoItems.push({ project: privName, amount: privAmt, tipo: 'boletas' })
+      }
+    }
+  }
+
+  const pendienteDetail: PendienteDetail = { publicoItems, privadoItems }
+
   // ── Monthly detail ────────────────────────────────────────────────────────
   const months: MonthDetail[] = []
 
@@ -361,7 +417,7 @@ function parseCursado(workbook: XLSX.WorkBook): {
     }
   }
 
-  return { pendiente, months }
+  return { pendiente, pendienteDetail, months }
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -372,9 +428,9 @@ export function getControlData(): ControlData {
   const workbook = getControlWorkbook()
   const { summary, totals } = parseResumen(workbook)
   const lastUpdate = parseLastUpdate(workbook)
-  const { pendiente, months } = parseCursado(workbook)
+  const { pendiente, pendienteDetail, months } = parseCursado(workbook)
 
-  controlCache = { lastUpdate, pendiente, summary, totals, months }
+  controlCache = { lastUpdate, pendiente, pendienteDetail, summary, totals, months }
   return controlCache
 }
 

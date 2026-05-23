@@ -17,8 +17,9 @@ const C = {
 } as const
 
 const MODULES = [
-  { href: '/proyectos', label: 'Proyectos',    icon: '⬡' },
-  { href: '/control',   label: 'Control 2026', icon: '◈' },
+  { href: '/proyectos',           label: 'Proyectos',                 icon: '⬡' },
+  { href: '/control',             label: 'Control Mensual 2026',      icon: '◈' },
+  { href: '/control-pendiente',   label: 'Pendiente Histórico',       icon: '◉' },
 ]
 
 export function Sidebar() {
