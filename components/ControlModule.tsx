@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { ControlData, MonthDetail, TipoIngreso } from '@/lib/control-parser'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 
@@ -123,7 +124,7 @@ function PendienteSection({ p }: { p: ControlData['pendiente'] }) {
 
 function SummaryTable({ summary, totals }: { summary: ControlData['summary']; totals: ControlData['totals'] }) {
   return (
-    <div style={{ background: C.card, borderRadius: 14, boxShadow: C.shadow, overflow: 'hidden', marginBottom: 28 }}>
+    <div style={{ background: C.card, borderRadius: 14, boxShadow: C.shadow, overflow: 'hidden', marginBottom: 28, overflowX: 'auto', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
       {/* Table header */}
       <div style={{ background: C.navy, padding: '14px 22px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
         {['Mes', 'Facturado Real', 'Ingreso Caja'].map((h, i) => (
@@ -312,6 +313,7 @@ function MonthCard({ mes, month, edits, onSave, onDelete }: {
   onSave: (e: MonthEdits) => void
   onDelete?: () => void        // for user-added months
 }) {
+  const isMobile = useIsMobile()
   const [editing, setEditing] = useState(!month) // new months start in edit mode
   const [draft, setDraft] = useState<Draft | null>(null)
 
@@ -421,7 +423,7 @@ function MonthCard({ mes, month, edits, onSave, onDelete }: {
       </div>
 
       {/* 3 boxes */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.65fr', gap: 14, padding: '16px 18px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 0.65fr', gap: 14, padding: isMobile ? '12px 12px' : '16px 18px' }}>
 
         {/* ── Box 1: Facturado ── */}
         <Box accent={C.blue} title="Facturado" editing={editing}>
@@ -584,6 +586,7 @@ function AddMonthPanel({ existingMonths, onAdd }: { existingMonths: string[]; on
 // ─── Main module ──────────────────────────────────────────────────────────────
 
 export function ControlModule({ data }: { data: ControlData }) {
+  const isMobile = useIsMobile()
   const [allEdits,    setAllEdits]    = useState<Record<string, MonthEdits>>({})
   const [extraMonths, setExtraMonths] = useState<string[]>([])
 
@@ -636,7 +639,7 @@ export function ControlModule({ data }: { data: ControlData }) {
 
   return (
     <div style={{ height: '100vh', overflowY: 'auto', background: C.canvas }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 24px 48px' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '16px 12px 32px' : '24px 24px 48px' }}>
 
         {/* Header */}
         <div style={{ marginBottom: 24 }}>

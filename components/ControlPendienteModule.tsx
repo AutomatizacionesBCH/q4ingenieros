@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import type { ControlData, TipoPendiente } from '@/lib/control-parser'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 
@@ -98,9 +99,11 @@ function toStored(items: ItemEdit[]): StoredItem[] {
 function SummaryCards({
   pubNoFac, pubFacNoCob, pubTotal,
   privNoFac, privBoletas, privTotal,
+  isMobile,
 }: {
   pubNoFac: number; pubFacNoCob: number; pubTotal: number
   privNoFac: number; privBoletas: number; privTotal: number
+  isMobile: boolean
 }) {
   const StatLine = ({ label, value, color }: { label: string; value: string; color: string }) => (
     <div style={{
@@ -113,7 +116,7 @@ function SummaryCards({
   )
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 28 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14, marginBottom: 28 }}>
 
       {/* Público */}
       <div style={{ background: C.card, borderRadius: 12, boxShadow: C.shadow, overflow: 'hidden' }}>
@@ -437,6 +440,7 @@ function PendienteTable({
 // ─── Main module ──────────────────────────────────────────────────────────────
 
 export function ControlPendienteModule({ data }: { data: ControlData }) {
+  const isMobile = useIsMobile()
   const [pubItems, setPubItems] = useState<ItemEdit[]>([])
   const [privItems, setPrivItems] = useState<ItemEdit[]>([])
 
@@ -475,7 +479,7 @@ export function ControlPendienteModule({ data }: { data: ControlData }) {
 
   return (
     <div style={{ height: '100vh', overflowY: 'auto', background: C.canvas }}>
-      <div style={{ maxWidth: 1300, margin: '0 auto', padding: '24px 24px 48px' }}>
+      <div style={{ maxWidth: 1300, margin: '0 auto', padding: isMobile ? '16px 12px 32px' : '24px 24px 48px' }}>
 
         {/* Header */}
         <div style={{ marginBottom: 24 }}>
@@ -493,6 +497,7 @@ export function ControlPendienteModule({ data }: { data: ControlData }) {
         <SummaryCards
           pubNoFac={pubNoFac} pubFacNoCob={pubFacNoCob} pubTotal={pubTotal}
           privNoFac={privNoFac} privBoletas={privBoletas} privTotal={privTotal}
+          isMobile={isMobile}
         />
 
         {/* Section label */}
@@ -500,8 +505,8 @@ export function ControlPendienteModule({ data }: { data: ControlData }) {
           Detalle de Pendientes
         </div>
 
-        {/* Tables side by side */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+        {/* Tables side by side — stack on mobile */}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 18 }}>
           <PendienteTable
             title="Públicos Pendientes a Facturar"
             headerColor={C.pub}

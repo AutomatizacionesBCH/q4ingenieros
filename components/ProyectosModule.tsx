@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import type { ProjectListItem } from '@/types/ui'
 import type { ProjectDetail, EP, ProjectStats } from '@/types/project'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -118,7 +119,7 @@ function ProjectDropdown({
   }, [projects, q])
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative', flex: 1, minWidth: 280 }}>
+    <div ref={wrapRef} style={{ position: 'relative', flex: 1, minWidth: 0, width: '100%' }}>
       {/* Trigger */}
       <button
         onClick={() => setOpen(o => !o)}
@@ -534,6 +535,7 @@ interface Props {
 }
 
 export function ProyectosModule({ projects, stats }: Props) {
+  const isMobile = useIsMobile()
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [detail, setDetail]         = useState<ProjectDetail | null>(null)
   const [loading, setLoading]       = useState(false)
@@ -569,28 +571,31 @@ export function ProyectosModule({ projects, stats }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: C.canvas }}>
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div style={{ padding: '20px 28px 0', flexShrink: 0 }}>
+      <div style={{ padding: isMobile ? '14px 14px 0' : '20px 28px 0', flexShrink: 0 }}>
 
         {/* Title + stat chips */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.textPrimary }}>Proyectos</h1>
-            <p style={{ margin: '2px 0 0', fontSize: 13, color: C.textSec }}>
-              Gestión de proyectos de ingeniería vial
-            </p>
+        <div style={{ display: 'flex', alignItems: isMobile ? 'center' : 'flex-start', justifyContent: 'space-between', marginBottom: 12, gap: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 18 : 22, fontWeight: 700, color: C.textPrimary }}>Proyectos</h1>
+            {!isMobile && (
+              <p style={{ margin: '2px 0 0', fontSize: 13, color: C.textSec }}>
+                Gestión de proyectos de ingeniería vial
+              </p>
+            )}
           </div>
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: isMobile ? 6 : 8, flexShrink: 0 }}>
             {[
               { label: 'Total',       value: stats.total,     color: C.textPrimary },
               { label: 'Activos',     value: stats.active,    color: C.orange },
-              { label: 'Finalizados', value: stats.finalized, color: C.success },
+              { label: 'Fin.',        value: stats.finalized, color: C.success },
             ].map(s => (
               <div key={s.label} style={{
                 background: C.card, border: `1px solid ${C.border}`,
-                borderRadius: 10, padding: '8px 14px', textAlign: 'center', minWidth: 62,
+                borderRadius: 8, padding: isMobile ? '6px 10px' : '8px 14px',
+                textAlign: 'center', minWidth: isMobile ? 44 : 62,
               }}>
-                <div style={{ fontSize: 20, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</div>
-                <div style={{ fontSize: 10, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 3 }}>
+                <div style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</div>
+                <div style={{ fontSize: 9, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>
                   {s.label}
                 </div>
               </div>
@@ -599,28 +604,30 @@ export function ProyectosModule({ projects, stats }: Props) {
         </div>
 
         {/* Selector row */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', paddingBottom: 16 }}>
-          {/* Project dropdown */}
-          <ProjectDropdown
-            projects={filtered}
-            selectedId={selectedId}
-            onSelect={selectProject}
-          />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', paddingBottom: 12 }}>
+          {/* Project dropdown — full width on mobile */}
+          <div style={{ width: isMobile ? '100%' : 'auto', flex: isMobile ? 'none' : 1 }}>
+            <ProjectDropdown
+              projects={filtered}
+              selectedId={selectedId}
+              onSelect={selectProject}
+            />
+          </div>
 
-          <select value={statusF}  onChange={e => setStatusF(e.target.value as StatusF)}   style={SEL}>
+          <select value={statusF}  onChange={e => setStatusF(e.target.value as StatusF)}   style={{ ...SEL, flex: isMobile ? 1 : 'none' }}>
             <option value="todos">Estado: Todos</option>
             <option value="activos">Activos</option>
             <option value="finalizados">Finalizados</option>
           </select>
 
-          <select value={gestionF} onChange={e => setGestionF(e.target.value as GestionF)} style={SEL}>
+          <select value={gestionF} onChange={e => setGestionF(e.target.value as GestionF)} style={{ ...SEL, flex: isMobile ? 1 : 'none' }}>
             <option value="todos">Gestión: Todos</option>
             <option value="m">Memoria</option>
             <option value="i">Ingeniería</option>
             <option value="e">Especialidades</option>
           </select>
 
-          <select value={ambitoF}  onChange={e => setAmbitoF(e.target.value as AmbitoF)}   style={SEL}>
+          <select value={ambitoF}  onChange={e => setAmbitoF(e.target.value as AmbitoF)}   style={{ ...SEL, flex: isMobile ? 1 : 'none' }}>
             <option value="todos">Ámbito: Todos</option>
             <option value="Público">Público</option>
             <option value="Privado">Privado</option>
@@ -637,7 +644,7 @@ export function ProyectosModule({ projects, stats }: Props) {
       {/* ── Content (full width) ────────────────────────────────────────────── */}
       <div style={{
         flex: 1, overflow: 'hidden',
-        margin: '0 28px 28px',
+        margin: isMobile ? '0 14px 14px' : '0 28px 28px',
         border: `1px solid ${C.border}`, borderRadius: 12,
         background: C.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
         display: 'flex', flexDirection: 'column',

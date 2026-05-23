@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { Sidebar, SIDEBAR_W } from '@/components/Sidebar'
+import { Sidebar } from '@/components/Sidebar'
+import { LayoutShell } from '@/components/LayoutShell'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -27,18 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         }}
       >
         <Sidebar />
-        <main
-          style={{
-            marginLeft: SIDEBAR_W,
-            flex: 1,
-            minHeight: '100vh',
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          {children}
-        </main>
+        <LayoutShell>{children}</LayoutShell>
       </body>
     </html>
   )
