@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
 import path from 'path'
 import fs from 'fs'
-import zlib from 'zlib'
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>
 import { getAllDocOverrides, setDocOverride } from '@/lib/db'
+
+// Suppress pdf-parse test-file noise in production logs
+process.env['PDFJS_DISABLE_WORKER'] = '1'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,9 +47,7 @@ function extractDateFromFilename(base: string): string | null {
   return null
 }
 
-// ── Find the FIRST date that appears in text (any format, no label required) ──
-// Returns the earliest-occurring date across all patterns.
-// This matches what the user sees at the top of the document.
+// ── Find the FIRST date that appears in extracted PDF text ───────────────────
 function findFirstDateInText(text: string): string | null {
   let best: { index: number; date: string } | null = null
 
@@ -53,85 +55,29 @@ function findFirstDateInText(text: string): string | null {
   const m1 = text.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](20\d{2})\b/)
   if (m1 && m1.index !== undefined) {
     const d = parseInt(m1[1]), mo = parseInt(m1[2])
-    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
-      best = { index: m1.index, date: `${m1[3]}-${m1[2].padStart(2, '0')}-${m1[1].padStart(2, '0')}` }
-    }
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31)
+      best = { index: m1.index, date: `${m1[3]}-${m1[2].padStart(2,'0')}-${m1[1].padStart(2,'0')}` }
   }
 
-  // Pattern 2: DD de MES del/de YYYY
-  const m2 = text.match(/\b(\d{1,2})\s+de\s+([A-Za-záéíóúÁÉÍÓÚñÑ]+)\s+del?\s+(20\d{2})\b/i)
+  // Pattern 2: DD de MES de/del YYYY
+  const m2 = text.match(/\b(\d{1,2})\s+de\s+([A-Za-záéíóúÁÉÍÓÚñÑ]+)\s+de(?:l)?\s+(20\d{2})\b/i)
   if (m2 && m2.index !== undefined) {
     const mes = MESES[m2[2].toLowerCase()]
-    if (mes && (best === null || m2.index < best.index)) {
-      best = { index: m2.index, date: `${m2[3]}-${mes}-${m2[1].padStart(2, '0')}` }
-    }
+    if (mes && (best === null || m2.index < best.index))
+      best = { index: m2.index, date: `${m2[3]}-${mes}-${m2[1].padStart(2,'0')}` }
   }
 
   return best?.date ?? null
 }
 
-// ── Date from PDF — decompresses FlateDecode streams (zlib, built-in Node) ────
-// Strategy: collect ALL decompressed text first (in document/stream order),
-// then find the FIRST date occurrence. This gives the date at the top of the
-// document — NOT the /CreationDate metadata (which reflects when the file was
-// saved, not when the document was issued).
-function extractDateFromPDF(filePath: string): string | null {
+// ── Extract date from PDF using pdf-parse (handles all font encodings) ────────
+// pdf-parse properly decodes CMap font tables, which our previous manual
+// zlib approach could not — fixing boletas whose text was unreadable.
+async function extractDateFromPDF(filePath: string): Promise<string | null> {
   try {
-    const buf = fs.readFileSync(filePath)
-
-    // Step 1: Collect text from all FlateDecode streams (document order)
-    const texts: string[] = []
-    const STREAM  = Buffer.from('stream')
-    const ENDSTRM = Buffer.from('endstream')
-    let pos = 0
-
-    while (pos < buf.length) {
-      const sIdx = buf.indexOf(STREAM, pos)
-      if (sIdx === -1) break
-
-      const afterStream = sIdx + STREAM.length
-      let dataStart: number
-      if (buf[afterStream] === 0x0A) {
-        dataStart = afterStream + 1
-      } else if (buf[afterStream] === 0x0D && buf[afterStream + 1] === 0x0A) {
-        dataStart = afterStream + 2
-      } else {
-        pos = sIdx + 1
-        continue
-      }
-
-      const eIdx = buf.indexOf(ENDSTRM, dataStart)
-      if (eIdx === -1) break
-
-      let dataEnd = eIdx
-      if (dataEnd > 0 && buf[dataEnd - 1] === 0x0A) dataEnd--
-      if (dataEnd > 0 && buf[dataEnd - 1] === 0x0D) dataEnd--
-
-      if (dataEnd > dataStart + 8) {
-        const chunk = buf.slice(dataStart, dataEnd)
-        try {
-          texts.push(zlib.inflateSync(chunk).toString('utf8'))
-        } catch {
-          try {
-            texts.push(zlib.inflateRawSync(chunk).toString('utf8'))
-          } catch { /* not a compressed stream — skip */ }
-        }
-      }
-
-      pos = eIdx + ENDSTRM.length
-    }
-
-    // Step 2: Search decompressed text for first date
-    if (texts.length > 0) {
-      const decompressed = texts.join('\n')
-      const d = findFirstDateInText(decompressed)
-      if (d) return d
-    }
-
-    // Step 3: Fallback — raw bytes (uncompressed PDFs, no CreationDate)
-    const rawLatin1 = buf.toString('latin1')
-    return findFirstDateInText(rawLatin1)
-
+    const buf  = fs.readFileSync(filePath)
+    const data = await pdfParse(buf)
+    return findFirstDateInText(data.text)
   } catch {
     return null
   }
@@ -221,7 +167,7 @@ export async function GET(req: Request) {
 
       // Extract from PDF
       const filePath  = path.join(docsRoot, doc.folder, doc.filename)
-      const extracted = extractDateFromPDF(filePath)
+      const extracted = await extractDateFromPDF(filePath)
       if (extracted && extracted !== overrides[doc.id]?.fecha) {
         await setDocOverride(doc.id, { fecha: extracted })
         overrides[doc.id] = { ...overrides[doc.id], fecha: extracted }
