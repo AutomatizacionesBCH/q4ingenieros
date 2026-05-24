@@ -332,10 +332,11 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 const PROJ_EDIT_KEY = 'proj_edit_v1'
 interface ProjEdits {
-  budget?:       number   // Líquido override
-  gross?:        number   // Bruto override
-  retention?:    number   // Retención override
-  egresos?:      number
+  budget?:        number   // Líquido override
+  gross?:         number   // Bruto override
+  retentionPct?:  number   // Retención % (e.g. 15.25)
+  retentionTipo?: 'boleta' | 'factura'
+  egresos?:       number
   eps?:          Record<number, { label?: string; amount?: number; paid?: boolean }>
   expenses?:     Record<number, { description?: string; amountNet?: number; tipo?: 'boleta' | 'factura' }>
   observations?: string
@@ -353,7 +354,7 @@ function saveProjEdits(id: number, edits: ProjEdits) {
     localStorage.setItem(PROJ_EDIT_KEY, JSON.stringify(all))
   } catch {}
 }
-type EditField = 'budget' | 'egresos' | 'gross' | 'retention'
+type EditField = 'budget' | 'egresos' | 'gross'
 
 function EditableKpi({
   label, value, color, isEditing, isOverridden, inputVal,
@@ -421,9 +422,10 @@ function EditableKpi({
 // ─── Active edit types + helpers ──────────────────────────────────────────────
 
 type ActiveEdit =
-  | { kind: 'kpi';     field: EditField }
-  | { kind: 'ep';      idx: number; col: 'label' | 'amount' }
-  | { kind: 'expense'; idx: number; col: 'description' | 'amountNet' }
+  | { kind: 'kpi';       field: EditField }
+  | { kind: 'retention' }
+  | { kind: 'ep';        idx: number; col: 'label' | 'amount' }
+  | { kind: 'expense';   idx: number; col: 'description' | 'amountNet' }
   | { kind: 'obs' }
   | null
 
@@ -526,6 +528,85 @@ function StaticKpi({ label, value, color, hint }: { label: string; value: number
   )
 }
 
+// ─── Retention KPI card ───────────────────────────────────────────────────────
+
+function RetentionKpi({
+  pct, amount, tipo, isEditing, inputVal, isOverridden,
+  onStartEdit, onInputChange, onCommit, onCancel, onReset, onSetTipo,
+}: {
+  pct: number | null; amount: number | null; tipo: 'boleta' | 'factura' | null
+  isEditing: boolean; inputVal: string; isOverridden: boolean
+  onStartEdit: () => void; onInputChange: (v: string) => void
+  onCommit: () => void; onCancel: () => void; onReset: () => void
+  onSetTipo: (t: 'boleta' | 'factura' | null) => void
+}) {
+  return (
+    <div style={{
+      background: C.card,
+      border: `1px solid ${isEditing ? C.orange : C.border}`,
+      borderRadius: 10, padding: '14px 16px',
+    }}>
+      <div style={{
+        fontSize: 9, fontWeight: 700, letterSpacing: '0.09em',
+        textTransform: 'uppercase', color: C.textMuted, marginBottom: 8,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <span>Retención SII</span>
+        {isOverridden && (
+          <span onClick={onReset} title="Restaurar" style={{ cursor: 'pointer', color: C.orange, fontSize: 13, lineHeight: 1 }}>↺</span>
+        )}
+      </div>
+
+      {/* Boleta / Factura toggle */}
+      <div style={{ display: 'inline-flex', borderRadius: 20, overflow: 'hidden', border: `1px solid ${C.border}`, marginBottom: 10 }}>
+        {(['boleta', 'factura'] as const).map(t => (
+          <button key={t} onClick={() => onSetTipo(tipo === t ? null : t)} style={{
+            padding: '3px 11px', fontSize: 10, fontWeight: 600, cursor: 'pointer',
+            border: 'none', outline: 'none',
+            color: tipo === t ? '#fff' : C.textMuted,
+            background: tipo === t ? (t === 'factura' ? '#1C2D5A' : C.textSec) : 'transparent',
+            transition: 'all 0.12s',
+          }}>
+            {t === 'factura' ? 'Factura' : 'Boleta'}
+          </button>
+        ))}
+      </div>
+
+      {/* Percentage — editable on click */}
+      {isEditing ? (
+        <div>
+          <input
+            autoFocus value={inputVal}
+            onChange={e => onInputChange(e.target.value)}
+            onBlur={onCommit}
+            onKeyDown={e => { if (e.key === 'Enter') onCommit(); if (e.key === 'Escape') onCancel() }}
+            placeholder="ej: 15.25"
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              fontSize: 17, fontWeight: 700, color: C.textMuted,
+              border: 'none', outline: 'none', background: 'transparent',
+              padding: 0, lineHeight: 1,
+            }}
+          />
+          <div style={{ fontSize: 9, color: C.textMuted, marginTop: 4, opacity: 0.6 }}>Ingresa el porcentaje (sin %)</div>
+        </div>
+      ) : (
+        <div onClick={onStartEdit} style={{ cursor: 'pointer' }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: C.textMuted, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+            {pct != null ? `${pct.toFixed(2)}%` : '—'}
+          </div>
+          {amount != null && (
+            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
+              {fmtCLP(amount)}
+            </div>
+          )}
+          <div style={{ fontSize: 9, color: C.textMuted, marginTop: 3, opacity: 0.6 }}>✎ editar</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
 
 function DetailPanel({ detail }: { detail: ProjectDetail }) {
@@ -548,9 +629,10 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
 
   const isAct = (ae: NonNullable<ActiveEdit>): boolean => {
     if (!active) return false
-    if (ae.kind === 'kpi')     return active.kind === 'kpi'     && active.field === ae.field
-    if (ae.kind === 'ep')      return active.kind === 'ep'      && active.idx === ae.idx && active.col === ae.col
-    if (ae.kind === 'expense') return active.kind === 'expense' && active.idx === ae.idx && active.col === ae.col
+    if (ae.kind === 'kpi')       return active.kind === 'kpi'       && active.field === ae.field
+    if (ae.kind === 'retention') return active.kind === 'retention'
+    if (ae.kind === 'ep')        return active.kind === 'ep'        && active.idx === ae.idx && active.col === ae.col
+    if (ae.kind === 'expense')   return active.kind === 'expense'   && active.idx === ae.idx && active.col === ae.col
     return active.kind === 'obs'
   }
 
@@ -564,7 +646,11 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
     if (!active) return
     const toNum = (s: string) => Number(s.replace(/[^0-9]/g, ''))
 
-    if (active.kind === 'kpi') {
+    if (active.kind === 'retention') {
+      const pct = parseFloat(inputVal.replace(',', '.').replace(/[^0-9.]/g, ''))
+      if (!isNaN(pct) && pct >= 0 && pct <= 100) persist({ ...edits, retentionPct: pct })
+
+    } else if (active.kind === 'kpi') {
       const n = Number(inputVal.replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, ''))
       if (!isNaN(n)) persist({ ...edits, [active.field]: n })
 
@@ -591,6 +677,18 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
   }
 
   function resetField(field: EditField) { const next = { ...edits }; delete next[field]; persist(next) }
+  function resetRetention() {
+    const next = { ...edits }
+    delete next.retentionPct
+    delete next.retentionTipo
+    persist(next)
+  }
+  function setRetentionTipo(tipo: 'boleta' | 'factura' | null) {
+    const next = { ...edits }
+    if (tipo == null) delete next.retentionTipo
+    else next.retentionTipo = tipo
+    persist(next)
+  }
 
   // EP helpers — paid state driven by override, falling back to realDate presence
   function isEpPaid(ep: EP, idx: number): boolean {
@@ -621,10 +719,24 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
   const pendienteCalc = detail.eps.reduce((s, ep, i) => !isEpPaid(ep, i) ? s + (getEp(ep, i).amount ?? 0) : s, 0)
 
   // Manually editable KPIs
-  const budget      = edits.budget    ?? detail.budget?.net       ?? null
-  const grossVal    = edits.gross     ?? detail.budget?.gross     ?? null
-  const retentionVal= edits.retention ?? detail.budget?.retention ?? null
-  const egresos     = edits.egresos   ?? (totalEgresosCalc || null)
+  const grossVal = edits.gross ?? detail.budget?.gross ?? null
+
+  // Retention: percentage drives the amount; infer pct from Excel if not overridden
+  const baseRetPct    = detail.budget?.gross && detail.budget?.retention
+    ? (detail.budget.retention / detail.budget.gross) * 100
+    : null
+  const retentionPct  = edits.retentionPct ?? baseRetPct
+  const retentionTipo = edits.retentionTipo ?? null
+  const retentionVal  = grossVal != null && retentionPct != null
+    ? Math.round(grossVal * retentionPct / 100)
+    : (detail.budget?.retention ?? null)
+
+  // Líquido: explicit override > gross − retention > Excel net
+  const budget = edits.budget ??
+    (grossVal != null && retentionVal != null ? grossVal - retentionVal : null) ??
+    detail.budget?.net ?? null
+
+  const egresos = edits.egresos ?? (totalEgresosCalc || null)
 
   const observations = edits.observations !== undefined ? edits.observations : (detail.observations ?? '')
 
@@ -675,9 +787,22 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
 
       {/* KPIs — desglose presupuesto */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
-        <EditableKpi {...kpiProps('gross',     grossVal,     C.textPrimary, 'Bruto')} />
-        <EditableKpi {...kpiProps('retention', retentionVal, C.textMuted,   'Retención')} />
-        <EditableKpi {...kpiProps('budget',    budget,       C.textPrimary, 'Líquido')} />
+        <EditableKpi {...kpiProps('gross',  grossVal, C.textPrimary, 'Bruto')} />
+        <RetentionKpi
+          pct={retentionPct}
+          amount={retentionVal}
+          tipo={retentionTipo}
+          isEditing={active?.kind === 'retention'}
+          inputVal={active?.kind === 'retention' ? inputVal : ''}
+          isOverridden={edits.retentionPct != null || edits.retentionTipo != null}
+          onStartEdit={() => startEdit({ kind: 'retention' }, retentionPct != null ? String(retentionPct) : '')}
+          onInputChange={setInputVal}
+          onCommit={commitEdit}
+          onCancel={() => setActive(null)}
+          onReset={resetRetention}
+          onSetTipo={setRetentionTipo}
+        />
+        <EditableKpi {...kpiProps('budget', budget, C.textPrimary, 'Líquido')} />
       </div>
 
       {/* KPIs — flujo de caja */}
