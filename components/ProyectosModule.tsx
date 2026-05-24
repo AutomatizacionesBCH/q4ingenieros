@@ -864,7 +864,7 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
             <tbody>
               {([
                 { label: 'Total Egresos',      value: fmtCLP(egresos), color: C.danger, bold: false },
-                { label: 'Utilidad',           value: fmtCLP(neto),    color: neto == null ? C.textSec : neto >= 0 ? C.success : C.danger, bold: true },
+                { label: 'Neto Q4 Ingenieros', value: fmtCLP(neto),    color: neto == null ? C.textSec : neto >= 0 ? C.success : C.danger, bold: true },
                 { label: 'Margen de Utilidad', value: marginCalc != null ? `${(marginCalc * 100).toFixed(1)}%` : '—', color: (marginCalc ?? 0) >= 0 ? C.success : C.danger, bold: true },
                 { label: 'Costo-Venta',        value: costoVenta != null ? `${(costoVenta * 100).toFixed(1)}%` : '—', color: C.textSec, bold: false },
               ] as { label: string; value: string; color: string; bold: boolean }[]).map((row, i) => (
