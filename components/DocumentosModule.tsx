@@ -85,7 +85,10 @@ export function DocumentosModule() {
   useEffect(() => {
     fetch('/api/documents')
       .then(r => r.ok ? r.json() : Promise.reject(r.statusText))
-      .then((data: DocItem[]) => { setDocs(data); setLoading(false) })
+      .then((data: { docs: DocItem[]; docsRoot?: string; cwd?: string }) => {
+        setDocs(data.docs ?? [])
+        setLoading(false)
+      })
       .catch(e => { setError(String(e)); setLoading(false) })
   }, [])
 
@@ -112,8 +115,8 @@ export function DocumentosModule() {
     nc:       docs.filter(d => d.tipo === 'Nota de Crédito').length,
   }), [docs])
 
-  const pdfUrl = (d: DocItem) =>
-    `/api/documents/file?folder=${d.folder}&name=${encodeURIComponent(d.filename)}`
+  // Static URL served directly by Next.js from public/docs/
+  const pdfUrl = (d: DocItem) => d.url
 
   const filterBtns: { label: string; value: TipoFilter; count: number; color: string }[] = [
     { label: 'Todos',    value: 'todos',                 count: counts.todos,    color: C.textPrimary },

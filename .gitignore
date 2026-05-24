@@ -42,5 +42,6 @@ next-env.d.ts
 
 # Permitir archivos en data/ (necesarios para producción)
 !data/*.xlsx
-!data/boletas/*.pdf
-!data/facturas/*.pdf
+# PDFs en public/docs/ — servidos como archivos estáticos
+!public/docs/boletas/*.pdf
+!public/docs/facturas/*.pdf

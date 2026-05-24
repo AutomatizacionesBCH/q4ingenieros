@@ -4,21 +4,17 @@ import fs from 'fs'
 
 export const dynamic = 'force-dynamic'
 
-// ── Path config ───────────────────────────────────────────────────────────────
-const BOLETAS_DIR  = process.env.DOCS_BOLETAS_PATH  ?? path.join(process.cwd(), 'data', 'boletas')
-const FACTURAS_DIR = process.env.DOCS_FACTURAS_PATH ?? path.join(process.cwd(), 'data', 'facturas')
-
-// ── Types ─────────────────────────────────────────────────────────────────────
 export interface DocItem {
-  id:          string           // "boletas/Boleta N°197...pdf"
+  id:          string
   filename:    string
   folder:      'boletas' | 'facturas'
   tipo:        'Factura' | 'Boleta de Honorarios' | 'Nota de Crédito'
   numero:      number | null
   descripcion: string
-  referencia:  string           // última parte tras la coma (ciudad / persona)
-  fecha:       string           // YYYY-MM-DD
+  referencia:  string
+  fecha:       string   // YYYY-MM-DD
   sizeKb:      number
+  url:         string   // static public URL — /docs/boletas/filename.pdf
 }
 
 // ── Parser ────────────────────────────────────────────────────────────────────
@@ -33,14 +29,14 @@ function parseDoc(filename: string, folder: 'boletas' | 'facturas', stat: fs.Sta
     tipo = 'Boleta de Honorarios'
   }
 
-  // Número: N°NNN, BH NNN, o primer bloque ≥3 dígitos
+  // Número
   const numMatch =
     base.match(/N[°o](\d+)/i) ||
     base.match(/^BH\s+(\d+)/i) ||
     base.match(/Fact\s+(\d+)/i)
   const numero = numMatch ? Number(numMatch[1]) : null
 
-  // Descripción: quitar prefijo de tipo + número
+  // Descripción: strip prefix + number
   let desc = base
   if (/^NC\s+Fact/i.test(desc)) {
     desc = numero ? `NC Factura #${numero}` : 'Nota de Crédito'
@@ -51,7 +47,6 @@ function parseDoc(filename: string, folder: 'boletas' | 'facturas', stat: fs.Sta
       .trim()
   }
 
-  // Referencia: último segmento tras coma
   const parts      = desc.split(',')
   const referencia = parts.length > 1 ? parts[parts.length - 1].trim() : '—'
   const descripcion = parts.length > 1 ? parts.slice(0, -1).join(',').trim() : desc.trim()
@@ -66,32 +61,40 @@ function parseDoc(filename: string, folder: 'boletas' | 'facturas', stat: fs.Sta
     referencia,
     fecha:  stat.mtime.toISOString().slice(0, 10),
     sizeKb: Math.round(stat.size / 1024),
+    // Static URL — served directly by Next.js from public/docs/
+    url: `/docs/${folder}/${encodeURIComponent(filename)}`,
   }
 }
 
-function readFolder(dir: string, folder: 'boletas' | 'facturas'): DocItem[] {
+function readFolder(docsRoot: string, folder: 'boletas' | 'facturas'): DocItem[] {
+  const dir = path.join(docsRoot, folder)
   if (!fs.existsSync(dir)) return []
-  return fs.readdirSync(dir)
-    .filter(f => /\.pdf$/i.test(f))
-    .map(f => {
-      const stat = fs.statSync(path.join(dir, f))
-      return parseDoc(f, folder, stat)
-    })
+  try {
+    return fs.readdirSync(dir)
+      .filter(f => /\.pdf$/i.test(f))
+      .map(f => {
+        const stat = fs.statSync(path.join(dir, f))
+        return parseDoc(f, folder, stat)
+      })
+  } catch {
+    return []
+  }
 }
 
-// ── GET /api/documents ────────────────────────────────────────────────────────
 export async function GET() {
   try {
-    const boletas  = readFolder(BOLETAS_DIR,  'boletas')
-    const facturas = readFolder(FACTURAS_DIR, 'facturas')
+    // public/ is always at process.cwd()/public in both dev and standalone
+    const docsRoot = path.join(process.cwd(), 'public', 'docs')
 
-    // Merge and sort: facturas first by número desc, then boletas by número desc
+    const boletas  = readFolder(docsRoot, 'boletas')
+    const facturas = readFolder(docsRoot, 'facturas')
+
     const all = [
       ...facturas.sort((a, b) => (b.numero ?? 0) - (a.numero ?? 0)),
       ...boletas.sort((a, b)  => (b.numero ?? 0) - (a.numero ?? 0)),
     ]
 
-    return NextResponse.json(all)
+    return NextResponse.json({ docs: all, docsRoot, cwd: process.cwd() })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
