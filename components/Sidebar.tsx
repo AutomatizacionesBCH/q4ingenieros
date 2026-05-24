@@ -19,9 +19,10 @@ const C = {
 } as const
 
 const MODULES = [
-  { href: '/proyectos',         label: 'Proyectos',            short: 'Proyectos',  icon: '⬡' },
-  { href: '/control',           label: 'Control Mensual 2026', short: 'Mensual',    icon: '◈' },
-  { href: '/control-pendiente', label: 'Pendiente Histórico',  short: 'Pendiente',  icon: '◉' },
+  { href: '/proyectos',         label: 'Proyectos',              short: 'Proyectos',  icon: '⬡' },
+  { href: '/control',           label: 'Control Mensual 2026',   short: 'Mensual',    icon: '◈' },
+  { href: '/control-pendiente', label: 'Pendiente Histórico',    short: 'Pendiente',  icon: '◉' },
+  { href: '/documentos',        label: 'Documentos Tributarios', short: 'Docs',       icon: '◧' },
 ]
 
 function useUF() {
