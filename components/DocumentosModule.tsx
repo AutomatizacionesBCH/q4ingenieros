@@ -35,7 +35,13 @@ const MESES_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Ag
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return '—'
   const [y, m, d] = iso.split('-')
-  return d === '01' ? `${MESES_ES[Number(m) - 1]} ${y}` : `${d}/${m}/${y}`
+  const dayNum = Number(d)
+  const mes    = MESES_FULL[Number(m) - 1]
+  // Month-only entries (day = 01 means no real day info) → "Mayo 2026"
+  // Real dates → "20 de Mayo del 2026"
+  return dayNum === 1 && iso.endsWith('-01')
+    ? `${mes} ${y}`
+    : `${dayNum} de ${mes} del ${y}`
 }
 
 function tipoBadge(tipo: DocItem['tipo']) {
@@ -103,9 +109,7 @@ export function DocumentosModule() {
   const [search,  setSearch]  = useState('')
 
   // Editing date inline
-  const [editingDate,    setEditingDate]    = useState<string | null>(null)
-  const [extracting,     setExtracting]     = useState(false)
-  const [extractResult,  setExtractResult]  = useState<string | null>(null)
+  const [editingDate, setEditingDate] = useState<string | null>(null)
 
   // ── Load data ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -176,24 +180,6 @@ export function DocumentosModule() {
   }), [docs, effectiveStatus])
 
   const csvRows = filtered.map(d => ({ ...d, efectiveStatus: effectiveStatus(d), efectiveFecha: effectiveFecha(d) }))
-  const missingDates = docs.filter(d => !effectiveFecha(d)).length
-
-  async function runExtraction() {
-    setExtracting(true)
-    setExtractResult(null)
-    try {
-      const r = await fetch('/api/admin/extract-pdf-dates', { method: 'POST' })
-      const j = await r.json()
-      setExtractResult(`✓ ${j.found} fechas encontradas, ${j.missing} sin fecha`)
-      // Reload overrides
-      const ov = await fetch('/api/document-overrides').then(x => x.json())
-      setOverrides(ov)
-    } catch (e) {
-      setExtractResult(`Error: ${String(e)}`)
-    } finally {
-      setExtracting(false)
-    }
-  }
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: C.canvas, overflow: 'hidden' }}>
@@ -205,31 +191,15 @@ export function DocumentosModule() {
             <h1 style={{ margin: 0, fontSize: isMobile ? 18 : 22, fontWeight: 700, color: C.textPrimary }}>Documentos Tributarios</h1>
             {!isMobile && <p style={{ margin: '2px 0 0', fontSize: 13, color: C.textSec }}>Facturas y boletas de honorarios 2026</p>}
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            {!loading && missingDates > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button onClick={runExtraction} disabled={extracting} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '8px 16px', borderRadius: 8, cursor: extracting ? 'wait' : 'pointer',
-                  fontSize: 13, fontWeight: 600,
-                  background: extracting ? C.listBg : '#1D4ED8', color: extracting ? C.textMuted : '#fff',
-                  border: `1px solid ${extracting ? C.border : '#1D4ED8'}`,
-                }}>
-                  {extracting ? '⏳ Leyendo PDFs…' : `🔍 Extraer fechas (${missingDates} sin fecha)`}
-                </button>
-                {extractResult && <span style={{ fontSize: 12, color: C.textSec }}>{extractResult}</span>}
-              </div>
-            )}
-            {!loading && filtered.length > 0 && (
-              <button onClick={() => exportCSV(csvRows)} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '8px 16px', borderRadius: 8, cursor: 'pointer',
-                fontSize: 13, fontWeight: 600, background: C.orange, color: '#fff', border: 'none',
-              }}>
-                ↓ Exportar CSV
-              </button>
-            )}
-          </div>
+          {!loading && filtered.length > 0 && (
+            <button onClick={() => exportCSV(csvRows)} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', borderRadius: 8, cursor: 'pointer',
+              fontSize: 13, fontWeight: 600, background: C.orange, color: '#fff', border: 'none',
+            }}>
+              ↓ Exportar CSV
+            </button>
+          )}
         </div>
 
         {/* ── Filters ── */}

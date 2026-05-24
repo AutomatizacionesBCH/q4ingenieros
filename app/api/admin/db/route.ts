@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+﻿import { NextResponse } from 'next/server'
 import Database from 'better-sqlite3'
 import path from 'path'
 

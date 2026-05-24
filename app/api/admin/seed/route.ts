@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+﻿import { NextResponse } from 'next/server'
 import { getProjectsIndex, getProjectDetail } from '@/lib/excel-parser'
 import { seedProject, seedProjectDetail } from '@/lib/db'
 
