@@ -221,23 +221,40 @@ export function DocumentosModule() {
             <Pill label="Pagado"    count={counts.pagado}    active={estadoF === 'pagado'}    color={C.success} onClick={() => setEstadoF('pagado')} />
           </div>
 
-          {/* Row 2: Mes + Buscar */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ fontSize: 11, color: C.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: 2 }}>Mes</span>
-            <Pill label="Todos" active={mesF === 'todos'} color={C.textPrimary} onClick={() => setMesF('todos')} />
-            {availableMonths.map(ym => {
-              const [y, m] = ym.split('-')
-              const label  = `${MESES_FULL[Number(m) - 1]} ${y}`
-              return <Pill key={ym} label={label} active={mesF === ym} color='#1D4ED8' onClick={() => setMesF(ym)} />
-            })}
-            {availableMonths.length === 0 && !loading && (
-              <span style={{ fontSize: 12, color: C.textMuted }}>Sin fechas registradas</span>
-            )}
+          {/* Row 2: Mes dropdown + Buscar */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: 11, color: C.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mes</span>
+            <select
+              value={mesF}
+              onChange={e => setMesF(e.target.value)}
+              style={{
+                padding: '5px 32px 5px 12px', borderRadius: 8, fontSize: 13,
+                border: `1px solid ${mesF !== 'todos' ? '#1D4ED8' : C.border}`,
+                background: mesF !== 'todos' ? '#EFF6FF' : C.card,
+                color: mesF !== 'todos' ? '#1D4ED8' : C.textPrimary,
+                fontWeight: mesF !== 'todos' ? 600 : 400,
+                outline: 'none', cursor: 'pointer',
+                appearance: 'none',
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 10px center',
+              }}
+            >
+              <option value="todos">Todos los meses</option>
+              {availableMonths.map(ym => {
+                const [y, m] = ym.split('-')
+                return (
+                  <option key={ym} value={ym}>
+                    {MESES_FULL[Number(m) - 1]} {y}
+                  </option>
+                )
+              })}
+            </select>
 
             <input
               value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Buscar..."
-              style={{ marginLeft: 8, flex: 1, minWidth: 140, maxWidth: 260, padding: '5px 12px', borderRadius: 8, fontSize: 13, border: `1px solid ${C.border}`, outline: 'none', color: C.textPrimary, background: C.card }}
+              style={{ flex: 1, minWidth: 140, maxWidth: 260, padding: '5px 12px', borderRadius: 8, fontSize: 13, border: `1px solid ${C.border}`, outline: 'none', color: C.textPrimary, background: C.card }}
             />
             {(tipoF !== 'todos' || estadoF !== 'todos' || mesF !== 'todos' || search) && (
               <span style={{ fontSize: 12, color: C.textMuted }}>{filtered.length} resultado{filtered.length !== 1 ? 's' : ''}</span>

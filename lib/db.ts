@@ -405,7 +405,7 @@ export function getAllDocOverrides(): Record<string, DocOverride> {
 export function setDocOverride(docId: string, override: DocOverride): void {
   db.prepare(`
     INSERT INTO document_overrides (doc_id, status, fecha, updated_at)
-    VALUES (?, ?, ?, datetime('now'))
+    VALUES (?, COALESCE(?, 'pendiente'), ?, datetime('now'))
     ON CONFLICT(doc_id) DO UPDATE SET
       status     = COALESCE(excluded.status, status),
       fecha      = COALESCE(excluded.fecha,  fecha),
