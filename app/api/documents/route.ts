@@ -160,12 +160,12 @@ export async function GET(req: Request) {
     overrides = await getAllDocOverrides()
 
     for (const doc of all) {
-      // Skip if already have a fecha AND not forcing refresh
+      // Skip only if Supabase already has an extracted/manual date AND not forcing refresh.
+      // Do NOT skip based on doc.fecha (filename-derived) — PDF date always takes precedence
+      // because filenames may only have the month (e.g. "Marzo") while the PDF has the full date.
       if (!refresh && overrides[doc.id]?.fecha) continue
-      // Skip if filename gave a full date AND not forcing refresh
-      if (!refresh && doc.fecha) continue
 
-      // Extract from PDF
+      // Extract from PDF (first visible date top-to-bottom)
       const filePath  = path.join(docsRoot, doc.folder, doc.filename)
       const extracted = await extractDateFromPDF(filePath)
       if (extracted && extracted !== overrides[doc.id]?.fecha) {
