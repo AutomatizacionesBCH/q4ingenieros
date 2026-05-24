@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getProjectDetailFromDB } from '@/lib/db'
 import { getProjectDetail } from '@/lib/excel-parser'
 
 export const dynamic = 'force-dynamic'
@@ -14,7 +15,8 @@ export async function GET(
       return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
     }
 
-    const project = getProjectDetail(id)
+    // Prefer SQLite (seeded data) — fall back to live Excel parse if not seeded yet
+    const project = getProjectDetailFromDB(id) ?? getProjectDetail(id)
     if (!project) {
       return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
     }
