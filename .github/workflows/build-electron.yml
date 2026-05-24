@@ -1,6 +1,6 @@
 name: Build Electron Installer
 
-# Triggers: manual button in GitHub UI, or any push that changes the electron-app
+# Triggers: manual button OR any push that touches the electron app / logo
 on:
   workflow_dispatch:
   push:
@@ -9,41 +9,70 @@ on:
       - 'electron-app/**'
       - 'public/logo.jpeg'
 
+# Needed to create/update the GitHub Release
+permissions:
+  contents: write
+
 jobs:
   build-windows:
-    runs-on: windows-latest   # Windows runner = no symlink issues
+    runs-on: windows-latest
 
     steps:
-      # ── 1. Checkout ──────────────────────────────────────────────────────────
-      - name: Checkout code
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # ── 2. Node.js ───────────────────────────────────────────────────────────
-      - name: Setup Node.js
+      # ── 2. Node 20 ─────────────────────────────────────────────────────────
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: electron-app/package-lock.json
 
-      # ── 3. Install deps ──────────────────────────────────────────────────────
+      # ── 3. Install npm packages ─────────────────────────────────────────────
       - name: Install dependencies
         working-directory: electron-app
-        run: npm ci
+        run: npm install
 
-      # ── 4. Build installer (.exe) ────────────────────────────────────────────
+      # ── 4. Convert logo → PNG + ICO ─────────────────────────────────────────
+      - name: Prepare icons
+        working-directory: electron-app
+        run: node scripts/prepare-icons.mjs
+
+      # ── 5. Build the installer (.exe) ────────────────────────────────────────
+      #       --publish never: we handle publishing ourselves in step 7
       - name: Build Windows installer
         working-directory: electron-app
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false   # no code signing cert needed
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run build
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          WIN_CSC_LINK: ''
+        run: npx electron-builder --win --x64 --publish never
 
-      # ── 5. Upload as downloadable artifact ───────────────────────────────────
-      - name: Upload installer
+      # ── 6. Upload as artifact (downloadable from Actions page, 90 days) ─────
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Q4-Ingenieros-Setup
+          name: Q4-Ingenieros-Installer
           path: electron-app/dist/*.exe
-          retention-days: 30
+          retention-days: 90
           if-no-files-found: error
+
+      # ── 7. Create / overwrite GitHub Release with the installer attached ─────
+      #       URL permanente: github.com/AutomatizacionesBCH/q4ingenieros/releases/latest
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: installer-latest
+          name: "Q4 Ingenieros — Instalador Windows"
+          body: |
+            ## Instalador para Windows
+
+            Descarga **`Q4 Ingenieros Setup 1.0.0.exe`** e instálalo como cualquier programa.
+
+            **Al instalar:**
+            - 🖥️ Acceso directo en el Escritorio con logo de Q4
+            - 📋 Entrada en el menú Inicio
+            - 🪟 Ventana nativa (sin barra de navegador)
+
+            > Requiere conexión a internet.
+          files: electron-app/dist/*.exe
+          make_latest: true

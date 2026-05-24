@@ -7,7 +7,7 @@
   "scripts": {
     "start": "electron .",
     "icons": "node scripts/prepare-icons.mjs",
-    "build": "npm run icons && electron-builder --win --x64",
+    "build": "npm run icons && electron-builder --win --x64 --publish never",
     "build:test": "npm run icons && electron-builder --win --x64 --dir"
   },
   "devDependencies": {
