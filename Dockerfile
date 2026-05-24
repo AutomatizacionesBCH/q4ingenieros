@@ -2,7 +2,9 @@ FROM node:20-alpine AS base
 
 # ── Deps ──────────────────────────────────────────────────────────────────────
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+# libc6-compat: Alpine compatibility shim
+# python3 make g++: required to compile native modules (better-sqlite3 uses node-gyp)
+RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci
@@ -18,6 +20,9 @@ RUN npm run build
 FROM base AS runner
 WORKDIR /app
 
+# libc6-compat needed at runtime for the compiled better-sqlite3 .node binary
+RUN apk add --no-cache libc6-compat
+
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
@@ -28,12 +33,16 @@ RUN addgroup --system --gid 1001 nodejs \
 # Static assets
 COPY --from=builder /app/public ./public
 
-# Standalone build
+# Standalone build output
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Excel data files
+# Excel + SQLite data directory
 COPY --from=builder --chown=nextjs:nodejs /app/data ./data
+
+# Native module: better-sqlite3 is not bundled by the standalone tracer.
+# Copy the full package (including the compiled .node binding) explicitly.
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
 
 USER nextjs
 
