@@ -20,8 +20,9 @@ RUN npm run build
 FROM base AS runner
 WORKDIR /app
 
-# libc6-compat needed at runtime for the compiled better-sqlite3 .node binary
-RUN apk add --no-cache libc6-compat
+# libc6-compat: needed at runtime for the compiled better-sqlite3 .node binary
+# sqlite: CLI for manual DB inspection via EasyPanel terminal
+RUN apk add --no-cache libc6-compat sqlite
 
 ENV NODE_ENV=production
 ENV PORT=3000
