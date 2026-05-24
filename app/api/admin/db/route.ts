@@ -1,38 +1,34 @@
 ﻿import { NextResponse } from 'next/server'
-import Database from 'better-sqlite3'
-import path from 'path'
+import { supabase } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
+const TABLES = [
+  'projects',
+  'project_details',
+  'eps',
+  'expenses',
+  'project_edits',
+  'project_status_overrides',
+  'document_overrides',
+] as const
+
 export async function GET() {
   try {
-    const dbFile = process.env.DB_PATH
-      ? path.join(process.env.DB_PATH, 'q4.db')
-      : path.join(process.cwd(), 'data', 'q4.db')
+    const counts: Record<string, number> = {}
 
-    const db = new Database(dbFile, { readonly: true })
-
-    // Schema de todas las tablas
-    const tables = db.prepare(
-      `SELECT name FROM sqlite_master WHERE type='table' ORDER BY name`
-    ).all() as { name: string }[]
-
-    const result: Record<string, { schema: string; rows: unknown[]; count: number }> = {}
-
-    for (const { name } of tables) {
-      const schema = (db.prepare(
-        `SELECT sql FROM sqlite_master WHERE type='table' AND name=?`
-      ).get(name) as { sql: string }).sql
-
-      const count = (db.prepare(`SELECT COUNT(*) as n FROM "${name}"`).get() as { n: number }).n
-      // Devuelve las primeras 50 filas
-      const rows = db.prepare(`SELECT * FROM "${name}" LIMIT 50`).all()
-
-      result[name] = { schema, count, rows }
+    for (const table of TABLES) {
+      const { count } = await supabase
+        .from(table)
+        .select('*', { count: 'exact', head: true })
+      counts[table] = count ?? 0
     }
 
-    db.close()
-    return NextResponse.json({ dbFile, tables: result })
+    return NextResponse.json({
+      provider: 'supabase',
+      url: process.env.SUPABASE_URL?.replace(/^https?:\/\//, '').split('.')[0] + '.supabase.co',
+      tables: counts,
+    })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }

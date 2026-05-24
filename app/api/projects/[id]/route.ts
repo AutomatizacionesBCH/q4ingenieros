@@ -15,8 +15,8 @@ export async function GET(
       return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
     }
 
-    // Prefer SQLite (seeded data) — fall back to live Excel parse if not seeded yet
-    const project = getProjectDetailFromDB(id) ?? getProjectDetail(id)
+    // Prefer Supabase — fall back to live Excel parse if not seeded yet
+    const project = (await getProjectDetailFromDB(id)) ?? getProjectDetail(id)
     if (!project) {
       return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
     }

@@ -19,7 +19,7 @@ export async function POST() {
     // 1. Seed project index (fast — only reads the Resumen sheet)
     const { projects, stats } = getProjectsIndex()
     for (const summary of projects) {
-      seedProject(summary)
+      await seedProject(summary)
     }
 
     // 2. Seed project details (reads each project sheet — slower on first run)
@@ -31,7 +31,7 @@ export async function POST() {
       try {
         const detail = getProjectDetail(summary.id)
         if (detail) {
-          seedProjectDetail(detail)
+          await seedProjectDetail(detail)
           seeded++
         } else {
           // Project exists in Resumen but has no sheet (e.g. project 174)

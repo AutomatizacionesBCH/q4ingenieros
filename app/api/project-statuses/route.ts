@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET() {
   try {
-    return NextResponse.json(getAllStatusOverrides())
+    return NextResponse.json(await getAllStatusOverrides())
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
@@ -31,7 +31,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Parámetros inválidos' }, { status: 400 })
     }
 
-    setStatusOverride(id, status as 'active' | 'finalized')
+    await setStatusOverride(id, status as 'active' | 'finalized')
     return NextResponse.json({ ok: true })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

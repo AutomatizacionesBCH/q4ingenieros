@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 /** GET /api/document-overrides → { [docId]: { status, fecha } } */
 export async function GET() {
   try {
-    return NextResponse.json(getAllDocOverrides())
+    return NextResponse.json(await getAllDocOverrides())
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
@@ -19,7 +19,7 @@ export async function PATCH(req: NextRequest) {
     if (!id) return NextResponse.json({ error: 'id requerido' }, { status: 400 })
     if (status && !['pagado', 'pendiente'].includes(status))
       return NextResponse.json({ error: 'status inválido' }, { status: 400 })
-    setDocOverride(String(id), { status, fecha })
+    await setDocOverride(String(id), { status, fecha })
     return NextResponse.json({ ok: true })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

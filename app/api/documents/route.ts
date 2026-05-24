@@ -210,25 +210,25 @@ export async function GET() {
     ...boletas.sort((a, b)  => (b.numero ?? 0) - (a.numero ?? 0)),
   ]
 
-  // ── 2. SQLite overrides + auto-extract dates (isolated) ───────────────────────
+  // ── 2. Supabase overrides + auto-extract dates (isolated) ────────────────────
   let overrides: Record<string, { fecha?: string }> = {}
   try {
-    overrides = getAllDocOverrides()
+    overrides = await getAllDocOverrides()
 
     for (const doc of all) {
-      if (overrides[doc.id]?.fecha) continue  // already saved in SQLite
+      if (overrides[doc.id]?.fecha) continue  // already saved in Supabase
       if (doc.fecha) continue                  // filename had a date — good enough
 
       // Decompress PDF streams and look for the emission date
       const filePath  = path.join(docsRoot, doc.folder, doc.filename)
       const extracted = extractDateFromPDF(filePath)
       if (extracted) {
-        setDocOverride(doc.id, { fecha: extracted })
+        await setDocOverride(doc.id, { fecha: extracted })
         overrides[doc.id] = { ...overrides[doc.id], fecha: extracted }
       }
     }
   } catch {
-    // SQLite unavailable — still return docs with filename-derived dates
+    // Supabase unavailable — still return docs with filename-derived dates
   }
 
   // ── 3. Merge best available fecha ─────────────────────────────────────────────

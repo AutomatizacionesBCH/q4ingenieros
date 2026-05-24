@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   try {
     // Prefer SQLite (seeded data) — fall back to live Excel parse if not seeded yet
-    const data = getProjectsFromDB() ?? getProjectsIndex()
+    const data = (await getProjectsFromDB()) ?? getProjectsIndex()
     return NextResponse.json(data)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
