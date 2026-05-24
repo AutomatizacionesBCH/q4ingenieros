@@ -35,13 +35,8 @@ const MESES_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Ag
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return '—'
   const [y, m, d] = iso.split('-')
-  const dayNum = Number(d)
-  const mes    = MESES_FULL[Number(m) - 1]
-  // Month-only entries (day = 01 means no real day info) → "Mayo 2026"
-  // Real dates → "20 de Mayo del 2026"
-  return dayNum === 1 && iso.endsWith('-01')
-    ? `${mes} ${y}`
-    : `${dayNum} de ${mes} del ${y}`
+  const mes = MESES_FULL[Number(m) - 1]
+  return `${Number(d)} de ${mes} del ${y}`
 }
 
 function tipoBadge(tipo: DocItem['tipo']) {
