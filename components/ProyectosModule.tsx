@@ -1112,22 +1112,27 @@ export function ProyectosModule({ projects, stats }: Props) {
             )}
           </div>
           <div style={{ display: 'flex', gap: isMobile ? 6 : 8, flexShrink: 0 }}>
-            {[
-              { label: 'Total',       value: stats.total,     color: C.textPrimary },
-              { label: 'Activos',     value: stats.active,    color: C.orange },
-              { label: 'Fin.',        value: stats.finalized, color: C.success },
-            ].map(s => (
-              <div key={s.label} style={{
-                background: C.card, border: `1px solid ${C.border}`,
-                borderRadius: 8, padding: isMobile ? '6px 10px' : '8px 14px',
-                textAlign: 'center', minWidth: isMobile ? 44 : 62,
-              }}>
-                <div style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</div>
-                <div style={{ fontSize: 9, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>
-                  {s.label}
-                </div>
-              </div>
-            ))}
+            {([
+              { label: 'Total',   value: stats.total,     color: C.textPrimary, filter: 'todos'        as StatusF },
+              { label: 'Activos', value: stats.active,    color: C.orange,      filter: 'activos'      as StatusF },
+              { label: 'Fin.',    value: stats.finalized, color: C.success,     filter: 'finalizados'  as StatusF },
+            ]).map(s => {
+              const isActive = statusF === s.filter
+              return (
+                <button key={s.label} onClick={() => setStatusF(s.filter)} style={{
+                  background:  isActive ? s.color : C.card,
+                  border:      `1px solid ${isActive ? s.color : C.border}`,
+                  borderRadius: 8, padding: isMobile ? '6px 10px' : '8px 14px',
+                  textAlign: 'center', minWidth: isMobile ? 44 : 62,
+                  cursor: 'pointer', transition: 'all 0.15s',
+                }}>
+                  <div style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700, color: isActive ? '#fff' : s.color, lineHeight: 1 }}>{s.value}</div>
+                  <div style={{ fontSize: 9, color: isActive ? 'rgba(255,255,255,0.8)' : C.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>
+                    {s.label}
+                  </div>
+                </button>
+              )
+            })}
           </div>
         </div>
 
