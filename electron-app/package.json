@@ -1,0 +1,55 @@
+{
+  "name": "q4-ingenieros",
+  "version": "1.0.0",
+  "description": "Q4 Ingenieros SpA — Dashboard de gestión de proyectos",
+  "main": "main.js",
+  "author": "Q4 Ingenieros SpA",
+  "scripts": {
+    "start": "electron .",
+    "icons": "node scripts/prepare-icons.mjs",
+    "build": "npm run icons && electron-builder --win --x64",
+    "build:test": "npm run icons && electron-builder --win --x64 --dir"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "jimp": "^0.22.12",
+    "png-to-ico": "^2.1.8"
+  },
+  "build": {
+    "appId": "com.q4ingenieros.dashboard",
+    "productName": "Q4 Ingenieros",
+    "copyright": "Copyright © 2026 Q4 Ingenieros SpA",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "offline.html",
+      "build/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Q4 Ingenieros",
+      "installerHeaderIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "license": null
+    }
+  }
+}

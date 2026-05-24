@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Q4 Ingenieros</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0F1A2E;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .icon { font-size: 64px; }
+    h1 { font-size: 24px; font-weight: 600; color: #E5501E; }
+    p  { font-size: 15px; color: #94A3B8; text-align: center; max-width: 360px; line-height: 1.6; }
+    button {
+      margin-top: 8px;
+      padding: 10px 28px;
+      background: #E5501E;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover { background: #c43e10; }
+  </style>
+</head>
+<body>
+  <div class="icon">🔌</div>
+  <h1>Sin conexión</h1>
+  <p>No se pudo conectar al servidor de Q4 Ingenieros.<br>Verifica tu conexión a internet e intenta nuevamente.</p>
+  <button onclick="location.href='https://achavez2-q4ingenieros.nxftdm.easypanel.host'">
+    Reintentar
+  </button>
+</body>
+</html>
