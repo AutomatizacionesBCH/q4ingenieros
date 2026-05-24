@@ -1,10 +1,10 @@
 /**
  * lib/db.ts — Supabase-backed data layer (all async)
  *
- * Replaces better-sqlite3. All functions return Promises.
- * Env vars required: SUPABASE_URL + SUPABASE_SERVICE_KEY
+ * Uses getSupabase() inside each function so the client is created lazily
+ * at request time — never during `npm run build`.
  */
-import { supabase } from './supabase'
+import { getSupabase } from './supabase'
 import type {
   ProjectSummary,
   ProjectDetail,
@@ -26,7 +26,7 @@ function chunk<T>(arr: T[], size: number): T[][] {
 
 export interface DocOverride {
   status?: 'pagado' | 'pendiente'
-  fecha?:  string   // YYYY-MM-DD
+  fecha?:  string
 }
 
 export interface DbEdits {
@@ -40,9 +40,10 @@ export interface DbEdits {
   observations?:  string
 }
 
-// ─── Document overrides (fecha + estado por documento) ───────────────────────
+// ─── Document overrides ───────────────────────────────────────────────────────
 
 export async function getAllDocOverrides(): Promise<Record<string, DocOverride>> {
+  const supabase = getSupabase()
   const { data, error } = await supabase
     .from('document_overrides')
     .select('doc_id, status, fecha')
@@ -60,7 +61,9 @@ export async function getAllDocOverrides(): Promise<Record<string, DocOverride>>
 }
 
 export async function setDocOverride(docId: string, override: DocOverride): Promise<void> {
-  // Fetch existing row to apply COALESCE logic (don't overwrite non-null fields with null)
+  const supabase = getSupabase()
+
+  // Fetch existing to apply COALESCE (don't overwrite non-null fields with null)
   const { data: existing } = await supabase
     .from('document_overrides')
     .select('status, fecha')
@@ -83,6 +86,7 @@ export async function setDocOverride(docId: string, override: DocOverride): Prom
 // ─── Manual project status overrides ─────────────────────────────────────────
 
 export async function getAllStatusOverrides(): Promise<Record<number, 'active' | 'finalized'>> {
+  const supabase = getSupabase()
   const { data, error } = await supabase
     .from('project_status_overrides')
     .select('project_id, status')
@@ -100,6 +104,7 @@ export async function setStatusOverride(
   projectId: number,
   status: 'active' | 'finalized',
 ): Promise<void> {
+  const supabase = getSupabase()
   await supabase
     .from('project_status_overrides')
     .upsert(
@@ -108,9 +113,10 @@ export async function setStatusOverride(
     )
 }
 
-// ─── Project edits (user overrides: budget, egresos, etc.) ───────────────────
+// ─── Project edits ────────────────────────────────────────────────────────────
 
 export async function getEdits(projectId: number): Promise<DbEdits> {
+  const supabase = getSupabase()
   const { data } = await supabase
     .from('project_edits')
     .select('*')
@@ -132,6 +138,7 @@ export async function getEdits(projectId: number): Promise<DbEdits> {
 }
 
 export async function saveEdits(projectId: number, edits: DbEdits): Promise<void> {
+  const supabase = getSupabase()
   await supabase
     .from('project_edits')
     .upsert(
@@ -151,24 +158,25 @@ export async function saveEdits(projectId: number, edits: DbEdits): Promise<void
     )
 }
 
-// ─── Project index (from Resumen sheet) ──────────────────────────────────────
+// ─── Project index ────────────────────────────────────────────────────────────
 
 function mapProject(row: Record<string, unknown>): ProjectSummary {
   return {
-    id:             row.id             as number,
-    client:         row.client         as string,
-    name:           row.name           as string,
-    startDate:      row.start_date     as string | null,
-    endDate:        row.end_date       as string | null,
-    status:         row.status         as string,
-    isFinalized:    row.is_finalized   as boolean,
+    id:             row.id              as number,
+    client:         row.client          as string,
+    name:           row.name            as string,
+    startDate:      row.start_date      as string | null,
+    endDate:        row.end_date        as string | null,
+    status:         row.status          as string,
+    isFinalized:    row.is_finalized    as boolean,
     managementType: row.management_type as ManagementType,
-    scope:          row.scope          as ProjectScope,
-    projectType:    row.project_type   as number | null,
+    scope:          row.scope           as ProjectScope,
+    projectType:    row.project_type    as number | null,
   }
 }
 
 export async function isDBSeeded(): Promise<boolean> {
+  const supabase = getSupabase()
   const { count } = await supabase
     .from('projects')
     .select('*', { count: 'exact', head: true })
@@ -176,6 +184,7 @@ export async function isDBSeeded(): Promise<boolean> {
 }
 
 export async function getProjectsFromDB(): Promise<ProjectsIndex | null> {
+  const supabase = getSupabase()
   const seeded = await isDBSeeded()
   if (!seeded) return null
 
@@ -199,6 +208,8 @@ export async function getProjectsFromDB(): Promise<ProjectsIndex | null> {
 }
 
 export async function getProjectDetailFromDB(id: number): Promise<ProjectDetail | null> {
+  const supabase = getSupabase()
+
   const { data: project } = await supabase
     .from('projects')
     .select('*')
@@ -242,9 +253,10 @@ export async function getProjectDetailFromDB(id: number): Promise<ProjectDetail 
   }
 }
 
-// ─── Seed functions (Excel → Supabase) ───────────────────────────────────────
+// ─── Seed functions ───────────────────────────────────────────────────────────
 
 export async function seedProject(summary: ProjectSummary): Promise<void> {
+  const supabase = getSupabase()
   await supabase
     .from('projects')
     .upsert(
@@ -266,7 +278,8 @@ export async function seedProject(summary: ProjectSummary): Promise<void> {
 }
 
 export async function seedProjectDetail(detail: ProjectDetail): Promise<void> {
-  // 1. Upsert project_details
+  const supabase = getSupabase()
+
   await supabase
     .from('project_details')
     .upsert(
@@ -286,22 +299,21 @@ export async function seedProjectDetail(detail: ProjectDetail): Promise<void> {
       { onConflict: 'project_id' },
     )
 
-  // 2. Replace EPs (delete + insert)
   await supabase.from('eps').delete().eq('project_id', detail.id)
   if (detail.eps.length > 0) {
-    const rows = detail.eps.map((ep, i) => ({
-      project_id:     detail.id,
-      idx:            i,
-      label:          ep.label,
-      amount:         ep.amount,
-      estimated_date: ep.estimatedDate,
-      real_date:      ep.realDate,
-      is_paid:        ep.isPaid,
-    }))
-    await supabase.from('eps').insert(rows)
+    await supabase.from('eps').insert(
+      detail.eps.map((ep, i) => ({
+        project_id:     detail.id,
+        idx:            i,
+        label:          ep.label,
+        amount:         ep.amount,
+        estimated_date: ep.estimatedDate,
+        real_date:      ep.realDate,
+        is_paid:        ep.isPaid,
+      })),
+    )
   }
 
-  // 3. Replace expenses (delete + insert)
   await supabase.from('expenses').delete().eq('project_id', detail.id)
   if (detail.expenses.length > 0) {
     const rows = detail.expenses.map((exp, i) => ({
@@ -312,7 +324,6 @@ export async function seedProjectDetail(detail: ProjectDetail): Promise<void> {
       amount_with_tax: exp.amountWithTax,
       is_section:      exp.isSection,
     }))
-    // Insert in chunks of 500 to stay within Supabase row limits
     for (const c of chunk(rows, 500)) {
       await supabase.from('expenses').insert(c)
     }

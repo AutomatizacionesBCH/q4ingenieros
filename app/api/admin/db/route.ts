@@ -1,5 +1,5 @@
 ﻿import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +15,7 @@ const TABLES = [
 
 export async function GET() {
   try {
+    const supabase = getSupabase()
     const counts: Record<string, number> = {}
 
     for (const table of TABLES) {

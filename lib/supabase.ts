@@ -1,17 +1,28 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 /**
- * Server-side Supabase client using the service role key.
- * - Bypasses Row Level Security (safe: only used in API routes, never in the browser)
- * - Env vars set in EasyPanel: SUPABASE_URL + SUPABASE_SERVICE_KEY
+ * Lazy Supabase client — created on first request, NOT at module load time.
+ * This prevents Next.js from crashing during `npm run build` when env vars
+ * are only available at runtime (EasyPanel injects them as runtime env, not
+ * as Docker build args).
  */
-export const supabase = createClient(
-  process.env.SUPABASE_URL     ?? '',
-  process.env.SUPABASE_SERVICE_KEY ?? '',
-  {
-    auth: {
-      persistSession:   false,
-      autoRefreshToken: false,
-    },
-  },
-)
+let _client: SupabaseClient | null = null
+
+export function getSupabase(): SupabaseClient {
+  if (_client) return _client
+
+  const url = process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_KEY
+
+  if (!url || !key) {
+    throw new Error(
+      'Missing Supabase env vars — set SUPABASE_URL and SUPABASE_SERVICE_KEY in EasyPanel.',
+    )
+  }
+
+  _client = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+
+  return _client
+}
