@@ -330,7 +330,6 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 // ─── Editable KPI ─────────────────────────────────────────────────────────────
 
-const PROJ_EDIT_KEY = 'proj_edit_v1'
 interface ProjEdits {
   budget?:        number   // Líquido override
   gross?:         number   // Bruto override
@@ -341,17 +340,20 @@ interface ProjEdits {
   expenses?:     Record<number, { description?: string; amountNet?: number; tipo?: 'boleta' | 'factura' }>
   observations?: string
 }
-function loadProjEdits(id: number): ProjEdits {
+async function loadProjEdits(id: number): Promise<ProjEdits> {
   try {
-    const all = JSON.parse(localStorage.getItem(PROJ_EDIT_KEY) ?? '{}') as Record<string, ProjEdits>
-    return all[String(id)] ?? {}
-  } catch { return {} }
+    const res = await fetch(`/api/edits/${id}`)
+    if (res.ok) return await res.json()
+  } catch {}
+  return {}
 }
-function saveProjEdits(id: number, edits: ProjEdits) {
+async function saveProjEdits(id: number, edits: ProjEdits) {
   try {
-    const all = JSON.parse(localStorage.getItem(PROJ_EDIT_KEY) ?? '{}') as Record<string, ProjEdits>
-    all[String(id)] = edits
-    localStorage.setItem(PROJ_EDIT_KEY, JSON.stringify(all))
+    await fetch(`/api/edits/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(edits),
+    })
   } catch {}
 }
 type EditField = 'budget' | 'egresos' | 'gross'
@@ -615,13 +617,14 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
     .filter(e => !e.isSection)
     .reduce((s, e) => s + (e.amountNet ?? 0), 0)
 
-  const [edits,    setEdits]    = useState<ProjEdits>(() => loadProjEdits(detail.id))
+  const [edits,    setEdits]    = useState<ProjEdits>({})
   const [active,   setActive]   = useState<ActiveEdit>(null)
   const [inputVal, setInputVal] = useState('')
 
   useEffect(() => {
-    setEdits(loadProjEdits(detail.id))
     setActive(null)
+    setEdits({})
+    loadProjEdits(detail.id).then(setEdits)
   }, [detail.id])
 
   function persist(next: ProjEdits) { setEdits(next); saveProjEdits(detail.id, next) }
