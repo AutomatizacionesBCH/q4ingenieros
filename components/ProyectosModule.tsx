@@ -337,7 +337,7 @@ interface ProjEdits {
   retentionTipo?: 'boleta' | 'factura'
   egresos?:       number
   eps?:          Record<number, { label?: string; amount?: number; paid?: boolean }>
-  expenses?:     Record<number, { description?: string; amountNet?: number; tipo?: 'boleta' | 'factura' }>
+  expenses?:     Record<number, { description?: string; amountNet?: number; tipo?: 'boleta' | 'factura'; paid?: boolean }>
   observations?: string
 }
 async function loadProjEdits(id: number): Promise<ProjEdits> {
@@ -908,6 +908,7 @@ function DetailPanel({
                   <th style={{ ...TH, textAlign: 'right' }}>Monto Neto</th>
                   <th style={{ ...TH, textAlign: 'center', width: 150 }}>Tipo</th>
                   <th style={{ ...TH, textAlign: 'right' }}>Con Impuesto</th>
+                  <th style={{ ...TH, textAlign: 'center', width: 110 }}>Estado</th>
                 </tr>
               </thead>
               <tbody>
@@ -917,7 +918,7 @@ function DetailPanel({
                     return (
                       <tr key={i} style={{ background: C.listBg, borderTop: `1px solid ${C.border}` }}>
                         <td
-                          colSpan={e.amountNet !== null ? 1 : 4}
+                          colSpan={e.amountNet !== null ? 1 : 5}
                           style={{
                             ...TD, fontWeight: 700, fontSize: 11,
                             color: C.textPrimary, letterSpacing: '0.05em',
@@ -934,6 +935,7 @@ function DetailPanel({
                             }}>
                               {fmtCLP(e.amountNet)}
                             </td>
+                            <td style={TD} />
                             <td style={TD} />
                             <td style={TD} />
                           </>
@@ -992,6 +994,33 @@ function DetailPanel({
                           <span style={{ color: C.textMuted }}>—</span>
                         )}
                       </td>
+                      <td style={{ ...TD, textAlign: 'center' }}>
+                        {(() => {
+                          const isPaid = ov.paid === true
+                          return (
+                            <button
+                              onClick={() => {
+                                const expEdits = { ...(edits.expenses ?? {}) }
+                                const cur = { ...(expEdits[i] ?? {}) }
+                                cur.paid = !isPaid
+                                expEdits[i] = cur
+                                persist({ ...edits, expenses: expEdits })
+                              }}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                                padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
+                                fontSize: 11, fontWeight: 600,
+                                border: `1px solid ${isPaid ? C.successBorder : C.border}`,
+                                background: isPaid ? C.successBg : 'transparent',
+                                color: isPaid ? C.success : C.textMuted,
+                                transition: 'all 0.15s',
+                              }}
+                            >
+                              {isPaid ? '✓ Pagado' : 'Pendiente'}
+                            </button>
+                          )
+                        })()}
+                      </td>
                     </tr>
                   )
                 })}
@@ -1006,6 +1035,7 @@ function DetailPanel({
                   <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: C.textSec, fontVariantNumeric: 'tabular-nums' }}>
                     {hasExpTipos ? fmtCLP(totalWithTax) : '—'}
                   </td>
+                  <td style={TD} />
                 </tr>
               </tfoot>
             </table>

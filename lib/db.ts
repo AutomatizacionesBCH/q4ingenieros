@@ -307,7 +307,7 @@ export interface DbEdits {
   retentionTipo?: 'boleta' | 'factura'
   egresos?:       number
   eps?:           Record<number, { label?: string; amount?: number; paid?: boolean }>
-  expenses?:      Record<number, { description?: string; amountNet?: number; tipo?: 'boleta' | 'factura' }>
+  expenses?:      Record<number, { description?: string; amountNet?: number; tipo?: 'boleta' | 'factura'; paid?: boolean }>
   observations?:  string
 }
 
