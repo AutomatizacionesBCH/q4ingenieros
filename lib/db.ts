@@ -22,6 +22,14 @@ db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')
 
 db.exec(`
+  -- ── Document overrides (fecha + estado por documento tributario) ──────────
+  CREATE TABLE IF NOT EXISTS document_overrides (
+    doc_id     TEXT PRIMARY KEY,
+    status     TEXT NOT NULL DEFAULT 'pendiente',
+    fecha      TEXT,
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
   -- ── Manual status overrides (user-controlled, default = active) ───────────
   CREATE TABLE IF NOT EXISTS project_status_overrides (
     project_id INTEGER PRIMARY KEY,
@@ -373,4 +381,34 @@ export function setStatusOverride(projectId: number, status: 'active' | 'finaliz
       status     = excluded.status,
       updated_at = excluded.updated_at
   `).run(projectId, status)
+}
+
+// ─── Document overrides (fecha + estado) ──────────────────────────────────────
+
+export interface DocOverride {
+  status?: 'pagado' | 'pendiente'
+  fecha?:  string   // YYYY-MM-DD
+}
+
+export function getAllDocOverrides(): Record<string, DocOverride> {
+  const rows = db.prepare('SELECT doc_id, status, fecha FROM document_overrides').all() as { doc_id: string; status: string; fecha: string | null }[]
+  const result: Record<string, DocOverride> = {}
+  for (const row of rows) {
+    result[row.doc_id] = {
+      status: row.status as 'pagado' | 'pendiente',
+      fecha:  row.fecha ?? undefined,
+    }
+  }
+  return result
+}
+
+export function setDocOverride(docId: string, override: DocOverride): void {
+  db.prepare(`
+    INSERT INTO document_overrides (doc_id, status, fecha, updated_at)
+    VALUES (?, ?, ?, datetime('now'))
+    ON CONFLICT(doc_id) DO UPDATE SET
+      status     = COALESCE(excluded.status, status),
+      fecha      = COALESCE(excluded.fecha,  fecha),
+      updated_at = excluded.updated_at
+  `).run(docId, override.status ?? null, override.fecha ?? null)
 }

@@ -12,13 +12,38 @@ export interface DocItem {
   numero:      number | null
   descripcion: string
   referencia:  string
-  fecha:       string   // YYYY-MM-DD
-  sizeKb:      number
-  url:         string   // static public URL — /docs/boletas/filename.pdf
+  fecha:       string | null   // YYYY-MM-DD extracted from filename, or null
+  url:         string          // static public URL
+}
+
+// ── Date extractor ────────────────────────────────────────────────────────────
+const MESES: Record<string, string> = {
+  enero: '01', febrero: '02', marzo: '03', abril: '04',
+  mayo: '05', junio: '06', julio: '07', agosto: '08',
+  septiembre: '09', octubre: '10', noviembre: '11', diciembre: '12',
+}
+
+function extractDate(base: string): string | null {
+  // DD.MM.YYYY  or  DD-MM-YYYY
+  const dmy = base.match(/(\d{1,2})[.\-](\d{2})[.\-](\d{4})/)
+  if (dmy) {
+    const [, d, m, y] = dmy
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+  }
+  // Nombre de mes + año opcional: "Febrero 2026", "Marzo SMAPA"
+  const lower = base.toLowerCase()
+  for (const [mes, num] of Object.entries(MESES)) {
+    if (lower.includes(mes)) {
+      const yearMatch = base.match(/\b(202\d)\b/)
+      const year = yearMatch ? yearMatch[1] : '2026'
+      return `${year}-${num}-01`
+    }
+  }
+  return null
 }
 
 // ── Parser ────────────────────────────────────────────────────────────────────
-function parseDoc(filename: string, folder: 'boletas' | 'facturas', stat: fs.Stats): DocItem {
+function parseDoc(filename: string, folder: 'boletas' | 'facturas'): DocItem {
   const base = filename.replace(/\.pdf$/i, '').trim()
 
   // Tipo
@@ -47,22 +72,20 @@ function parseDoc(filename: string, folder: 'boletas' | 'facturas', stat: fs.Sta
       .trim()
   }
 
-  const parts      = desc.split(',')
-  const referencia = parts.length > 1 ? parts[parts.length - 1].trim() : '—'
+  const parts       = desc.split(',')
+  const referencia  = parts.length > 1 ? parts[parts.length - 1].trim() : '—'
   const descripcion = parts.length > 1 ? parts.slice(0, -1).join(',').trim() : desc.trim()
 
   return {
-    id:          `${folder}/${filename}`,
+    id:    `${folder}/${filename}`,
     filename,
     folder,
     tipo,
     numero,
     descripcion,
     referencia,
-    fecha:  stat.mtime.toISOString().slice(0, 10),
-    sizeKb: Math.round(stat.size / 1024),
-    // Static URL — served directly by Next.js from public/docs/
-    url: `/docs/${folder}/${encodeURIComponent(filename)}`,
+    fecha: extractDate(base),
+    url:   `/docs/${folder}/${encodeURIComponent(filename)}`,
   }
 }
 
@@ -72,10 +95,7 @@ function readFolder(docsRoot: string, folder: 'boletas' | 'facturas'): DocItem[]
   try {
     return fs.readdirSync(dir)
       .filter(f => /\.pdf$/i.test(f))
-      .map(f => {
-        const stat = fs.statSync(path.join(dir, f))
-        return parseDoc(f, folder, stat)
-      })
+      .map(f => parseDoc(f, folder))
   } catch {
     return []
   }
