@@ -139,21 +139,22 @@ function readFolder(docsRoot: string, folder: 'boletas' | 'facturas'): DocItem[]
 }
 
 export async function GET() {
+  const docsRoot = path.join(process.cwd(), 'public', 'docs')
+
+  // ── 1. Always list files first (never blocked by SQLite) ─────────────────────
+  const boletas  = readFolder(docsRoot, 'boletas')
+  const facturas = readFolder(docsRoot, 'facturas')
+
+  const all = [
+    ...facturas.sort((a, b) => (b.numero ?? 0) - (a.numero ?? 0)),
+    ...boletas.sort((a, b)  => (b.numero ?? 0) - (a.numero ?? 0)),
+  ]
+
+  // ── 2. SQLite: load overrides + auto-extract dates (isolated — never breaks listing) ──
+  let overrides: Record<string, { fecha?: string }> = {}
   try {
-    const docsRoot = path.join(process.cwd(), 'public', 'docs')
+    overrides = getAllDocOverrides()
 
-    const boletas  = readFolder(docsRoot, 'boletas')
-    const facturas = readFolder(docsRoot, 'facturas')
-
-    const all = [
-      ...facturas.sort((a, b) => (b.numero ?? 0) - (a.numero ?? 0)),
-      ...boletas.sort((a, b)  => (b.numero ?? 0) - (a.numero ?? 0)),
-    ]
-
-    // Load SQLite overrides (includes both auto-extracted and user-set dates)
-    const overrides = getAllDocOverrides()
-
-    // Auto-extract PDF dates for docs that have no date anywhere yet
     for (const doc of all) {
       if (overrides[doc.id]?.fecha) continue  // already in SQLite
       if (doc.fecha) continue                  // derived from filename — good enough
@@ -162,19 +163,18 @@ export async function GET() {
       const extracted = extractDateFromPDFBytes(filePath)
       if (extracted) {
         setDocOverride(doc.id, { fecha: extracted })
-        // Patch the local overrides object so the merge below sees it immediately
         overrides[doc.id] = { ...overrides[doc.id], fecha: extracted }
       }
     }
-
-    // Merge: override.fecha > pdf-extracted (now in override) > filename-derived
-    const merged = all.map(doc => ({
-      ...doc,
-      fecha: overrides[doc.id]?.fecha ?? doc.fecha,
-    }))
-
-    return NextResponse.json({ docs: merged, docsRoot, cwd: process.cwd() })
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+  } catch {
+    // SQLite unavailable — return docs with filename-derived dates only
   }
+
+  // ── 3. Merge and return ───────────────────────────────────────────────────────
+  const merged = all.map(doc => ({
+    ...doc,
+    fecha: overrides[doc.id]?.fecha ?? doc.fecha,
+  }))
+
+  return NextResponse.json({ docs: merged, docsRoot, cwd: process.cwd() })
 }
