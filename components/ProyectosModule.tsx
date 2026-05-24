@@ -507,7 +507,7 @@ function EmptyDetail({ total }: { total: number }) {
 
 // ─── Static KPI card (auto-calculated, not editable) ─────────────────────────
 
-function StaticKpi({ label, value, color, hint }: { label: string; value: number; color: string; hint: string }) {
+function StaticKpi({ label, value, color, hint }: { label: string; value: number | null; color: string; hint: string }) {
   return (
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 16px' }}>
       <div style={{
@@ -624,11 +624,10 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
 
   const observations = edits.observations !== undefined ? edits.observations : (detail.observations ?? '')
 
-  // Analysis — prefer Excel's pre-calculated values, fall back to computed
-  const utilityCalc = budget != null && egresos != null ? budget - egresos : null
-  const utilityShow = detail.utility ?? utilityCalc
-  const marginShow  = detail.margin  ?? (budget != null && budget > 0 && utilityShow != null ? utilityShow / budget : null)
-  const costoVenta  = budget != null && budget > 0 && egresos != null ? egresos / budget : null
+  // Neto = Líquido − Egresos. Always computed to avoid #¡REF! errors from Excel formulas.
+  const neto       = budget != null && egresos != null ? budget - egresos : null
+  const marginCalc = budget != null && budget > 0 && neto != null ? neto / budget : null
+  const costoVenta = budget != null && budget > 0 && egresos != null ? egresos / budget : null
 
   // Total Con Impuesto — leaf rows only (skip section headers)
   const totalWithTax = detail.expenses.reduce((sum, e, i) => {
@@ -670,13 +669,25 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
         )}
       </div>
 
-      {/* KPIs */}
+      {/* KPIs — desglose presupuesto */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
+        <StaticKpi label="Bruto"     value={detail.budget.gross}     color={C.textPrimary} hint="Precio adjudicado" />
+        <StaticKpi label="Retención" value={detail.budget.retention} color={C.textMuted}   hint="Retención SII" />
+        <EditableKpi {...kpiProps('budget', budget, C.textPrimary, 'Líquido')} />
+      </div>
+
+      {/* KPIs — flujo de caja */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
-        <EditableKpi {...kpiProps('budget',  budget,  C.textPrimary, 'Presupuesto')} />
         {/* Pagado and Pendiente are auto-calculated from EP toggle states */}
         <StaticKpi label="Pagado"    value={pagadoCalc}    color={C.success} hint="∑ EPs pagados" />
         <StaticKpi label="Pendiente" value={pendienteCalc} color={C.orange}  hint="∑ EPs pendientes" />
-        <EditableKpi {...kpiProps('egresos', egresos, C.danger,      'Egresos')} />
+        <EditableKpi {...kpiProps('egresos', egresos, C.danger, 'Egresos')} />
+        <StaticKpi
+          label="Neto"
+          value={neto}
+          color={neto == null ? C.textMuted : neto >= 0 ? C.success : C.danger}
+          hint="Líquido − Egresos"
+        />
       </div>
 
       {/* EPs — editable table with toggle estado */}
@@ -852,10 +863,10 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <tbody>
               {([
-                { label: 'Total Egresos',      value: fmtCLP(egresos),      color: C.danger,  bold: false },
-                { label: 'Utilidad',           value: fmtCLP(utilityShow),  color: (utilityShow ?? 0) >= 0 ? C.success : C.danger, bold: true },
-                { label: 'Margen de Utilidad', value: marginShow  != null ? `${(marginShow  * 100).toFixed(1)}%` : '—', color: (marginShow  ?? 0) >= 0 ? C.success : C.danger, bold: true },
-                { label: 'Costo-Venta',        value: costoVenta  != null ? `${(costoVenta  * 100).toFixed(1)}%` : '—', color: C.textSec, bold: false },
+                { label: 'Total Egresos',      value: fmtCLP(egresos), color: C.danger, bold: false },
+                { label: 'Utilidad',           value: fmtCLP(neto),    color: neto == null ? C.textSec : neto >= 0 ? C.success : C.danger, bold: true },
+                { label: 'Margen de Utilidad', value: marginCalc != null ? `${(marginCalc * 100).toFixed(1)}%` : '—', color: (marginCalc ?? 0) >= 0 ? C.success : C.danger, bold: true },
+                { label: 'Costo-Venta',        value: costoVenta != null ? `${(costoVenta * 100).toFixed(1)}%` : '—', color: C.textSec, bold: false },
               ] as { label: string; value: string; color: string; bold: boolean }[]).map((row, i) => (
                 <tr key={i} style={{ borderTop: i > 0 ? `1px solid ${C.border}` : 'none', background: i % 2 === 0 ? C.listBg : C.card }}>
                   <td style={{ ...TD, fontWeight: row.bold ? 600 : 400, color: C.textSec, width: '60%' }}>{row.label}</td>
