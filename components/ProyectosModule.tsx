@@ -332,7 +332,9 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 const PROJ_EDIT_KEY = 'proj_edit_v1'
 interface ProjEdits {
-  budget?:       number
+  budget?:       number   // Líquido override
+  gross?:        number   // Bruto override
+  retention?:    number   // Retención override
   egresos?:      number
   eps?:          Record<number, { label?: string; amount?: number; paid?: boolean }>
   expenses?:     Record<number, { description?: string; amountNet?: number; tipo?: 'boleta' | 'factura' }>
@@ -351,7 +353,7 @@ function saveProjEdits(id: number, edits: ProjEdits) {
     localStorage.setItem(PROJ_EDIT_KEY, JSON.stringify(all))
   } catch {}
 }
-type EditField = 'budget' | 'egresos'
+type EditField = 'budget' | 'egresos' | 'gross' | 'retention'
 
 function EditableKpi({
   label, value, color, isEditing, isOverridden, inputVal,
@@ -619,8 +621,10 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
   const pendienteCalc = detail.eps.reduce((s, ep, i) => !isEpPaid(ep, i) ? s + (getEp(ep, i).amount ?? 0) : s, 0)
 
   // Manually editable KPIs
-  const budget  = edits.budget  ?? detail.budget?.net ?? null
-  const egresos = edits.egresos ?? (totalEgresosCalc || null)
+  const budget      = edits.budget    ?? detail.budget?.net       ?? null
+  const grossVal    = edits.gross     ?? detail.budget?.gross     ?? null
+  const retentionVal= edits.retention ?? detail.budget?.retention ?? null
+  const egresos     = edits.egresos   ?? (totalEgresosCalc || null)
 
   const observations = edits.observations !== undefined ? edits.observations : (detail.observations ?? '')
 
@@ -671,23 +675,17 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
 
       {/* KPIs — desglose presupuesto */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
-        <StaticKpi label="Bruto"     value={detail.budget.gross}     color={C.textPrimary} hint="Precio adjudicado" />
-        <StaticKpi label="Retención" value={detail.budget.retention} color={C.textMuted}   hint="Retención SII" />
-        <EditableKpi {...kpiProps('budget', budget, C.textPrimary, 'Líquido')} />
+        <EditableKpi {...kpiProps('gross',     grossVal,     C.textPrimary, 'Bruto')} />
+        <EditableKpi {...kpiProps('retention', retentionVal, C.textMuted,   'Retención')} />
+        <EditableKpi {...kpiProps('budget',    budget,       C.textPrimary, 'Líquido')} />
       </div>
 
       {/* KPIs — flujo de caja */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 28 }}>
         {/* Pagado and Pendiente are auto-calculated from EP toggle states */}
         <StaticKpi label="Pagado"    value={pagadoCalc}    color={C.success} hint="∑ EPs pagados" />
         <StaticKpi label="Pendiente" value={pendienteCalc} color={C.orange}  hint="∑ EPs pendientes" />
         <EditableKpi {...kpiProps('egresos', egresos, C.danger, 'Egresos')} />
-        <StaticKpi
-          label="Neto"
-          value={neto}
-          color={neto == null ? C.textMuted : neto >= 0 ? C.success : C.danger}
-          hint="Líquido − Egresos"
-        />
       </div>
 
       {/* EPs — editable table with toggle estado */}
