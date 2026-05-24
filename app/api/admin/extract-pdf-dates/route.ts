@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
 import path from 'path'
 import fs from 'fs'
-import pdf from 'pdf-parse'
 import { setDocOverride } from '@/lib/db'
+
+// pdf-parse is CJS — require() avoids the ESM default-export type error
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>
 
 export const dynamic = 'force-dynamic'
 
@@ -51,7 +54,7 @@ function extractDateFromText(text: string): string | null {
 async function processPDF(filePath: string, docId: string): Promise<{ docId: string; fecha: string | null; error?: string }> {
   try {
     const buf  = fs.readFileSync(filePath)
-    const data = await pdf(buf)
+    const data = await pdfParse(buf)
     const fecha = extractDateFromText(data.text)
     if (fecha) setDocOverride(docId, { fecha })
     return { docId, fecha }
