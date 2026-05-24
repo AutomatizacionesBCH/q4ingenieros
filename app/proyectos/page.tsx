@@ -9,7 +9,7 @@ import { ProyectosModule } from '@/components/ProyectosModule'
 import type { ProjectListItem } from '@/types/ui'
 
 export default function ProyectosPage() {
-  const { projects, stats } = getProjectsIndex()
+  const { projects } = getProjectsIndex()
 
   const listItems: ProjectListItem[] = projects.map(p => {
     const detail = getProjectDetail(p.id) // null for project 174
@@ -31,5 +31,5 @@ export default function ProyectosPage() {
     }
   })
 
-  return <ProyectosModule projects={listItems} stats={stats} />
+  return <ProyectosModule projects={listItems} />
 }

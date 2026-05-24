@@ -22,6 +22,13 @@ db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')
 
 db.exec(`
+  -- ── Manual status overrides (user-controlled, default = active) ───────────
+  CREATE TABLE IF NOT EXISTS project_status_overrides (
+    project_id INTEGER PRIMARY KEY,
+    status     TEXT NOT NULL DEFAULT 'active',
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
   -- ── User overrides (pre-existing) ─────────────────────────────────────────
   CREATE TABLE IF NOT EXISTS project_edits (
     project_id     INTEGER PRIMARY KEY,
@@ -345,4 +352,25 @@ export function saveEdits(projectId: number, edits: DbEdits): void {
     edits.expenses ? JSON.stringify(edits.expenses) : null,
     edits.observations  ?? null,
   )
+}
+
+// ─── Manual status overrides ──────────────────────────────────────────────────
+
+export function getAllStatusOverrides(): Record<number, 'active' | 'finalized'> {
+  const rows = db.prepare('SELECT project_id, status FROM project_status_overrides').all() as { project_id: number; status: string }[]
+  const result: Record<number, 'active' | 'finalized'> = {}
+  for (const row of rows) {
+    result[row.project_id] = row.status as 'active' | 'finalized'
+  }
+  return result
+}
+
+export function setStatusOverride(projectId: number, status: 'active' | 'finalized'): void {
+  db.prepare(`
+    INSERT INTO project_status_overrides (project_id, status, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(project_id) DO UPDATE SET
+      status     = excluded.status,
+      updated_at = excluded.updated_at
+  `).run(projectId, status)
 }

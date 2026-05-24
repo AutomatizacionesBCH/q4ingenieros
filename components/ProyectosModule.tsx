@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import type { ProjectListItem } from '@/types/ui'
-import type { ProjectDetail, EP, ProjectStats } from '@/types/project'
+import type { ProjectDetail, EP } from '@/types/project'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -611,7 +611,15 @@ function RetentionKpi({
 
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
 
-function DetailPanel({ detail }: { detail: ProjectDetail }) {
+function DetailPanel({
+  detail,
+  currentStatus,
+  onStatusChange,
+}: {
+  detail: ProjectDetail
+  currentStatus: 'active' | 'finalized'
+  onStatusChange: (s: 'active' | 'finalized') => void
+}) {
   // Only sum leaf items — section/subtotal rows are excluded to avoid double-counting
   const totalEgresosCalc = detail.expenses
     .filter(e => !e.isSection)
@@ -778,14 +786,37 @@ function DetailPanel({ detail }: { detail: ProjectDetail }) {
 
       {/* Header */}
       <div style={{ paddingBottom: 20, marginBottom: 24, borderBottom: `1px solid ${C.border}` }}>
-        <div style={{ fontFamily: 'monospace', fontSize: 12, color: C.textMuted, marginBottom: 6 }}>#{detail.id}</div>
-        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.textPrimary, lineHeight: 1.3 }}>{detail.name}</h2>
-        <div style={{ fontSize: 14, color: C.textSec, marginTop: 6 }}>{detail.client}</div>
-        {(detail.scope || detail.managementType) && (
-          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>
-            {[detail.scope, gestionLabel(detail.managementType)].filter(Boolean).join(' · ')}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 12, color: C.textMuted, marginBottom: 6 }}>#{detail.id}</div>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.textPrimary, lineHeight: 1.3 }}>{detail.name}</h2>
+            <div style={{ fontSize: 14, color: C.textSec, marginTop: 6 }}>{detail.client}</div>
+            {(detail.scope || detail.managementType) && (
+              <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>
+                {[detail.scope, gestionLabel(detail.managementType)].filter(Boolean).join(' · ')}
+              </div>
+            )}
           </div>
-        )}
+          {/* Estado manual del proyecto */}
+          <div style={{ display: 'flex', gap: 4, flexShrink: 0, marginTop: 2 }}>
+            {(['active', 'finalized'] as const).map(s => {
+              const isOn = currentStatus === s
+              const color = s === 'active' ? C.orange : C.success
+              const label = s === 'active' ? 'Activo' : 'Finalizado'
+              return (
+                <button key={s} onClick={() => onStatusChange(s)} style={{
+                  padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                  border: `1px solid ${isOn ? color : C.border}`,
+                  background: isOn ? color : 'transparent',
+                  color: isOn ? '#fff' : C.textMuted,
+                  cursor: 'pointer', transition: 'all 0.15s',
+                }}>
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
       </div>
 
       {/* KPIs — desglose presupuesto */}
@@ -1061,10 +1092,9 @@ type AmbitoF  = 'todos' | 'Público' | 'Privado'
 
 interface Props {
   projects: ProjectListItem[]
-  stats: ProjectStats
 }
 
-export function ProyectosModule({ projects, stats }: Props) {
+export function ProyectosModule({ projects }: Props) {
   const isMobile = useIsMobile()
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [detail, setDetail]         = useState<ProjectDetail | null>(null)
@@ -1073,13 +1103,47 @@ export function ProyectosModule({ projects, stats }: Props) {
   const [statusF,  setStatusF]  = useState<StatusF>('todos')
   const [ambitoF,  setAmbitoF]  = useState<AmbitoF>('todos')
 
+  // ── Manual status overrides (user-controlled, loaded once on mount) ────────
+  const [statusOverrides, setStatusOverrides] = useState<Record<number, 'active' | 'finalized'>>({})
+
+  useEffect(() => {
+    fetch('/api/project-statuses')
+      .then(r => r.ok ? r.json() : {})
+      .then((data: Record<number, 'active' | 'finalized'>) => setStatusOverrides(data))
+      .catch(() => {})
+  }, [])
+
+  // effectiveIsFinalized: manual override > default (active)
+  const effectiveIsFinalized = useCallback((id: number) =>
+    (statusOverrides[id] ?? 'active') === 'finalized'
+  , [statusOverrides])
+
+  // Toggle and persist a project's manual status
+  const toggleProjectStatus = useCallback(async (id: number, status: 'active' | 'finalized') => {
+    setStatusOverrides(prev => ({ ...prev, [id]: status }))
+    try {
+      await fetch('/api/project-statuses', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status }),
+      })
+    } catch {}
+  }, [])
+
+  // Stats recomputed from manual overrides
+  const liveStats = useMemo(() => {
+    const active    = projects.filter(p => !effectiveIsFinalized(p.id)).length
+    const finalized = projects.filter(p =>  effectiveIsFinalized(p.id)).length
+    return { total: projects.length, active, finalized }
+  }, [projects, effectiveIsFinalized])
+
   // Projects available in the dropdown (after external filters)
   const filtered = useMemo(() => projects.filter(p => {
-    if (statusF  === 'activos'     && p.isFinalized)  return false
-    if (statusF  === 'finalizados' && !p.isFinalized) return false
-    if (ambitoF  !== 'todos' && p.scope !== ambitoF)  return false
+    if (statusF  === 'activos'     &&  effectiveIsFinalized(p.id)) return false
+    if (statusF  === 'finalizados' && !effectiveIsFinalized(p.id)) return false
+    if (ambitoF  !== 'todos' && p.scope !== ambitoF)               return false
     return true
-  }), [projects, statusF, ambitoF])
+  }), [projects, statusF, ambitoF, effectiveIsFinalized])
 
   const isFiltering = statusF !== 'todos' || ambitoF !== 'todos'
 
@@ -1113,9 +1177,9 @@ export function ProyectosModule({ projects, stats }: Props) {
           </div>
           <div style={{ display: 'flex', gap: isMobile ? 6 : 8, flexShrink: 0 }}>
             {([
-              { label: 'Total',   value: stats.total,     color: C.textPrimary, filter: 'todos'        as StatusF },
-              { label: 'Activos', value: stats.active,    color: C.orange,      filter: 'activos'      as StatusF },
-              { label: 'Fin.',    value: stats.finalized, color: C.success,     filter: 'finalizados'  as StatusF },
+              { label: 'Total',   value: liveStats.total,     color: C.textPrimary, filter: 'todos'        as StatusF },
+              { label: 'Activos', value: liveStats.active,    color: C.orange,      filter: 'activos'      as StatusF },
+              { label: 'Fin.',    value: liveStats.finalized, color: C.success,     filter: 'finalizados'  as StatusF },
             ]).map(s => {
               const isActive = statusF === s.filter
               return (
@@ -1179,7 +1243,11 @@ export function ProyectosModule({ projects, stats }: Props) {
           <Skeleton />
         ) : detail ? (
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            <DetailPanel detail={detail} />
+            <DetailPanel
+              detail={detail}
+              currentStatus={effectiveIsFinalized(detail.id) ? 'finalized' : 'active'}
+              onStatusChange={s => toggleProjectStatus(detail.id, s)}
+            />
           </div>
         ) : (
           <EmptyDetail total={filtered.length} />
