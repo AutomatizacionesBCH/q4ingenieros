@@ -441,10 +441,11 @@ function RetentionKpi({
 // ─── Active edit types ────────────────────────────────────────────────────────
 
 type ActiveEdit =
-  | { kind: 'kpi';       field: EditField }
+  | { kind: 'kpi';              field: EditField }
+  | { kind: 'analysis-egresos'                   }   // Separate kind — prevents dual-autoFocus bug
   | { kind: 'retention' }
-  | { kind: 'ep';        idx: number; col: 'label' | 'amount' }
-  | { kind: 'expense';   idx: number; col: 'description' | 'amountNet' }
+  | { kind: 'ep';               idx: number; col: 'label' | 'amount' }
+  | { kind: 'expense';          idx: number; col: 'description' | 'amountNet' }
   | { kind: 'obs' }
   | null
 
@@ -566,10 +567,11 @@ function DetailPanel({
 
   const isAct = (ae: NonNullable<ActiveEdit>): boolean => {
     if (!active) return false
-    if (ae.kind === 'kpi')       return active.kind === 'kpi'       && active.field === ae.field
-    if (ae.kind === 'retention') return active.kind === 'retention'
-    if (ae.kind === 'ep')        return active.kind === 'ep'        && active.idx === ae.idx && active.col === ae.col
-    if (ae.kind === 'expense')   return active.kind === 'expense'   && active.idx === ae.idx && active.col === ae.col
+    if (ae.kind === 'kpi')              return active.kind === 'kpi'       && active.field === ae.field
+    if (ae.kind === 'analysis-egresos') return active.kind === 'analysis-egresos'
+    if (ae.kind === 'retention')        return active.kind === 'retention'
+    if (ae.kind === 'ep')               return active.kind === 'ep'        && active.idx === ae.idx && active.col === ae.col
+    if (ae.kind === 'expense')          return active.kind === 'expense'   && active.idx === ae.idx && active.col === ae.col
     return active.kind === 'obs'
   }
 
@@ -586,6 +588,11 @@ function DetailPanel({
     if (active.kind === 'retention') {
       const pct = parseFloat(inputVal.replace(',', '.').replace(/[^0-9.]/g, ''))
       if (!isNaN(pct) && pct >= 0 && pct <= 100) persist({ ...edits, retentionPct: pct })
+
+    } else if (active.kind === 'analysis-egresos') {
+      // Same logic as kpi/egresos but isolated kind so both inputs don't mount together
+      const n = Number(inputVal.replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, ''))
+      if (!isNaN(n)) persist({ ...edits, egresos: n })
 
     } else if (active.kind === 'kpi') {
       const n = Number(inputVal.replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, ''))
@@ -706,12 +713,12 @@ function DetailPanel({
     onReset:       () => resetField(field),
   })
 
-  // Ref for the analysis-table egresos input (to call select() there too)
+  // Ref + select-all for analysis table egresos input (isolated from KPI card)
   const analysisEgresosRef = useRef<HTMLInputElement>(null)
-  const isEditingAnalysisEgresos = active?.kind === 'kpi' && active.field === 'egresos'
+  const isEditingAnalysis = active?.kind === 'analysis-egresos'
   useEffect(() => {
-    if (isEditingAnalysisEgresos) analysisEgresosRef.current?.select()
-  }, [isEditingAnalysisEgresos])
+    if (isEditingAnalysis) analysisEgresosRef.current?.select()
+  }, [isEditingAnalysis])
 
   return (
     <div style={{ padding: '28px 32px 40px', maxWidth: 900 }}>
@@ -979,7 +986,10 @@ function DetailPanel({
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <tbody>
 
-              {/* Total Egresos — editable. Shows input right here so user doesn't need to scroll. */}
+              {/* Total Egresos — editable via its OWN kind (analysis-egresos).
+                  Keeps this input isolated from the KPI card input above.
+                  If both used the same kind, both got autoFocus and the first
+                  would immediately onBlur → commitEdit → close. */}
               <tr style={{ background: C.listBg }}>
                 <td style={{ ...TD, color: C.textSec, width: '60%' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -994,7 +1004,7 @@ function DetailPanel({
                   </span>
                 </td>
                 <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                  {isEditingAnalysisEgresos ? (
+                  {isEditingAnalysis ? (
                     <input
                       ref={analysisEgresosRef}
                       autoFocus
@@ -1014,7 +1024,7 @@ function DetailPanel({
                   ) : (
                     <span
                       onClick={() => startEdit(
-                        { kind: 'kpi', field: 'egresos' },
+                        { kind: 'analysis-egresos' },
                         egresos != null ? String(Math.round(egresos)) : '0'
                       )}
                       title="Clic para editar"
