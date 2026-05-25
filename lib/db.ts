@@ -46,19 +46,33 @@ export interface DbEdits {
 
 export async function getAllDocOverrides(): Promise<Record<string, DocOverride>> {
   const supabase = getSupabase()
-  const { data, error } = await supabase
+
+  // Intentar con columnas extendidas (descripcion, referencia).
+  // Si la migración v2 no se ejecutó, PostgREST devuelve 400 → fallback a columnas base.
+  let { data, error } = await supabase
     .from('document_overrides')
     .select('doc_id, status, fecha, descripcion, referencia')
 
-  if (error || !data) return {}
+  if (error) {
+    // Fallback: solo columnas que existen desde el schema original
+    const res = await supabase
+      .from('document_overrides')
+      .select('doc_id, status, fecha')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data  = res.data as any
+    error = res.error
+    if (error) console.error('[getAllDocOverrides] fallback also failed:', error.message)
+  }
+
+  if (!data) return {}
 
   const result: Record<string, DocOverride> = {}
   for (const row of data) {
     result[row.doc_id] = {
       status:      row.status      as 'pagado' | 'pendiente' | undefined,
       fecha:       row.fecha       ?? undefined,
-      descripcion: row.descripcion ?? undefined,
-      referencia:  row.referencia  ?? undefined,
+      descripcion: (row as Record<string, unknown>).descripcion as string | undefined ?? undefined,
+      referencia:  (row as Record<string, unknown>).referencia  as string | undefined ?? undefined,
     }
   }
   return result
@@ -67,26 +81,42 @@ export async function getAllDocOverrides(): Promise<Record<string, DocOverride>>
 export async function setDocOverride(docId: string, override: DocOverride): Promise<void> {
   const supabase = getSupabase()
 
-  // Fetch existing to apply COALESCE (don't overwrite non-null fields with null)
+  // Leer campos base existentes (status, fecha) — columnas que SIEMPRE existen
   const { data: existing } = await supabase
     .from('document_overrides')
-    .select('status, fecha, descripcion, referencia')
+    .select('status, fecha')
     .eq('doc_id', docId)
     .maybeSingle()
 
-  await supabase
+  // Payload base (siempre seguro)
+  const basePayload: Record<string, unknown> = {
+    doc_id:     docId,
+    status:     override.status ?? existing?.status ?? 'pendiente',
+    fecha:      override.fecha  ?? existing?.fecha  ?? null,
+    updated_at: new Date().toISOString(),
+  }
+
+  // Incluir campos extendidos solo si fueron provistos explícitamente
+  const hasExtended = override.descripcion !== undefined || override.referencia !== undefined
+  const fullPayload = hasExtended
+    ? {
+        ...basePayload,
+        ...(override.descripcion !== undefined ? { descripcion: override.descripcion || null } : {}),
+        ...(override.referencia  !== undefined ? { referencia:  override.referencia  || null } : {}),
+      }
+    : basePayload
+
+  const { error } = await supabase
     .from('document_overrides')
-    .upsert(
-      {
-        doc_id:      docId,
-        status:      override.status      ?? existing?.status      ?? 'pendiente',
-        fecha:       override.fecha       ?? existing?.fecha       ?? null,
-        descripcion: override.descripcion ?? existing?.descripcion ?? null,
-        referencia:  override.referencia  ?? existing?.referencia  ?? null,
-        updated_at:  new Date().toISOString(),
-      },
-      { onConflict: 'doc_id' },
-    )
+    .upsert(fullPayload, { onConflict: 'doc_id' })
+
+  // Si falló por columnas inexistentes, reintentar solo con payload base
+  if (error && hasExtended) {
+    console.warn('[setDocOverride] Columnas extendidas ausentes — ejecutar document_overrides_v2.sql')
+    await supabase
+      .from('document_overrides')
+      .upsert(basePayload, { onConflict: 'doc_id' })
+  }
 }
 
 // ─── Propuesta de Cierre overrides ───────────────────────────────────────────
@@ -100,19 +130,33 @@ export interface PropuestaOverride {
 
 export async function getPropuestaOverrides(): Promise<Record<string, PropuestaOverride>> {
   const supabase = getSupabase()
-  const { data, error } = await supabase
+
+  // Intentar con columnas extendidas (v2). Si la migración no se ejecutó → fallback.
+  let { data, error } = await supabase
     .from('propuesta_overrides')
     .select('doc_id, contraparte, proyecto, especialista, comuna')
 
-  if (error || !data) return {}
+  if (error) {
+    // Migración v2 no ejecutada — la tabla existe pero sin esas columnas
+    const res = await supabase
+      .from('propuesta_overrides')
+      .select('doc_id')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data  = res.data as any
+    error = res.error
+    if (error) console.error('[getPropuestaOverrides] fallback also failed:', error.message)
+  }
+
+  if (!data) return {}
 
   const result: Record<string, PropuestaOverride> = {}
   for (const row of data) {
+    const r = row as Record<string, unknown>
     result[row.doc_id] = {
-      contraparte:  row.contraparte  ?? undefined,
-      proyecto:     row.proyecto     ?? undefined,
-      especialista: row.especialista ?? undefined,
-      comuna:       row.comuna       ?? undefined,
+      contraparte:  r.contraparte  as string | undefined ?? undefined,
+      proyecto:     r.proyecto     as string | undefined ?? undefined,
+      especialista: r.especialista as string | undefined ?? undefined,
+      comuna:       r.comuna       as string | undefined ?? undefined,
     }
   }
   return result
@@ -121,25 +165,33 @@ export async function getPropuestaOverrides(): Promise<Record<string, PropuestaO
 export async function setPropuestaOverride(docId: string, override: PropuestaOverride): Promise<void> {
   const supabase = getSupabase()
 
+  // Leer existente con solo las columnas que podrían estar disponibles
   const { data: existing } = await supabase
     .from('propuesta_overrides')
     .select('contraparte, proyecto, especialista, comuna')
     .eq('doc_id', docId)
     .maybeSingle()
 
-  await supabase
+  const payload: Record<string, unknown> = {
+    doc_id:       docId,
+    contraparte:  override.contraparte  ?? (existing as Record<string,unknown> | null)?.contraparte  ?? null,
+    proyecto:     override.proyecto     ?? (existing as Record<string,unknown> | null)?.proyecto     ?? null,
+    especialista: override.especialista ?? (existing as Record<string,unknown> | null)?.especialista ?? null,
+    comuna:       override.comuna       ?? (existing as Record<string,unknown> | null)?.comuna       ?? null,
+    updated_at:   new Date().toISOString(),
+  }
+
+  const { error } = await supabase
     .from('propuesta_overrides')
-    .upsert(
-      {
-        doc_id:       docId,
-        contraparte:  override.contraparte  ?? existing?.contraparte  ?? null,
-        proyecto:     override.proyecto     ?? existing?.proyecto     ?? null,
-        especialista: override.especialista ?? existing?.especialista ?? null,
-        comuna:       override.comuna       ?? existing?.comuna       ?? null,
-        updated_at:   new Date().toISOString(),
-      },
-      { onConflict: 'doc_id' },
-    )
+    .upsert(payload, { onConflict: 'doc_id' })
+
+  if (error) {
+    // Columnas extendidas no existen aún — guardar solo doc_id para reservar la fila
+    console.warn('[setPropuestaOverride] Columnas extendidas ausentes — ejecutar propuesta_overrides_v2.sql')
+    await supabase
+      .from('propuesta_overrides')
+      .upsert({ doc_id: docId, updated_at: new Date().toISOString() }, { onConflict: 'doc_id' })
+  }
 }
 
 // ─── Manual project status overrides ─────────────────────────────────────────
