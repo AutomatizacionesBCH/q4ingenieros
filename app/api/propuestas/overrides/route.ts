@@ -13,17 +13,20 @@ export async function GET() {
   }
 }
 
-// PATCH /api/propuestas/overrides  — body: { id, fecha?, status? }
+// PATCH /api/propuestas/overrides — body: { id, contraparte?, proyecto?, especialista?, comuna? }
 export async function PATCH(req: Request) {
   try {
     const body = await req.json()
-    const { id, fecha, status } = body as { id: string; fecha?: string; status?: string }
+    const { id, contraparte, proyecto, especialista, comuna } = body as {
+      id:           string
+      contraparte?:  string
+      proyecto?:     string
+      especialista?: string
+      comuna?:       string
+    }
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
-    await setPropuestaOverride(id, {
-      fecha:  fecha  ?? undefined,
-      status: status as 'pendiente' | 'firmado' | undefined,
-    })
+    await setPropuestaOverride(id, { contraparte, proyecto, especialista, comuna })
     return NextResponse.json({ ok: true })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

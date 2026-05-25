@@ -86,23 +86,27 @@ export async function setDocOverride(docId: string, override: DocOverride): Prom
 // ─── Propuesta de Cierre overrides ───────────────────────────────────────────
 
 export interface PropuestaOverride {
-  status?: 'pendiente' | 'firmado'
-  fecha?:  string
+  contraparte?:  string
+  proyecto?:     string
+  especialista?: string
+  comuna?:       string
 }
 
 export async function getPropuestaOverrides(): Promise<Record<string, PropuestaOverride>> {
   const supabase = getSupabase()
   const { data, error } = await supabase
     .from('propuesta_overrides')
-    .select('doc_id, status, fecha')
+    .select('doc_id, contraparte, proyecto, especialista, comuna')
 
   if (error || !data) return {}
 
   const result: Record<string, PropuestaOverride> = {}
   for (const row of data) {
     result[row.doc_id] = {
-      status: row.status as 'pendiente' | 'firmado' | undefined,
-      fecha:  row.fecha  ?? undefined,
+      contraparte:  row.contraparte  ?? undefined,
+      proyecto:     row.proyecto     ?? undefined,
+      especialista: row.especialista ?? undefined,
+      comuna:       row.comuna       ?? undefined,
     }
   }
   return result
@@ -113,7 +117,7 @@ export async function setPropuestaOverride(docId: string, override: PropuestaOve
 
   const { data: existing } = await supabase
     .from('propuesta_overrides')
-    .select('status, fecha')
+    .select('contraparte, proyecto, especialista, comuna')
     .eq('doc_id', docId)
     .maybeSingle()
 
@@ -121,10 +125,12 @@ export async function setPropuestaOverride(docId: string, override: PropuestaOve
     .from('propuesta_overrides')
     .upsert(
       {
-        doc_id:     docId,
-        status:     override.status ?? existing?.status ?? 'pendiente',
-        fecha:      override.fecha  ?? existing?.fecha  ?? null,
-        updated_at: new Date().toISOString(),
+        doc_id:       docId,
+        contraparte:  override.contraparte  ?? existing?.contraparte  ?? null,
+        proyecto:     override.proyecto     ?? existing?.proyecto     ?? null,
+        especialista: override.especialista ?? existing?.especialista ?? null,
+        comuna:       override.comuna       ?? existing?.comuna       ?? null,
+        updated_at:   new Date().toISOString(),
       },
       { onConflict: 'doc_id' },
     )
