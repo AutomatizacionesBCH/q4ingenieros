@@ -27,7 +27,6 @@ const C = {
   dangerBg:      '#FEF2F2',
   dangerBorder:  '#FECACA',
   listBg:        '#F8FAFC',
-  heroBg:        '#FAFBFD',
 } as const
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
@@ -80,7 +79,8 @@ function ProjectDropdown({
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false); setQ('')
+        setOpen(false)
+        setQ('')
       }
     }
     document.addEventListener('mousedown', handler)
@@ -124,7 +124,8 @@ function ProjectDropdown({
         </span>
         <span style={{
           flexShrink: 0, color: C.textMuted, fontSize: 10,
-          transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s',
+          transform: open ? 'rotate(180deg)' : 'none',
+          transition: 'transform 0.15s',
         }}>▾</span>
       </button>
 
@@ -212,34 +213,30 @@ function ProjectDropdown({
 // ─── Table styles ─────────────────────────────────────────────────────────────
 
 const TH: React.CSSProperties = {
-  padding: '9px 14px', textAlign: 'left',
+  padding: '8px 12px', textAlign: 'left',
   fontSize: 10, fontWeight: 700, color: '#94A3B8',
   textTransform: 'uppercase', letterSpacing: '0.06em',
 }
 const TD: React.CSSProperties = {
-  padding: '9px 14px', fontSize: 13, color: '#0F1A2E',
+  padding: '8px 12px', fontSize: 12, color: '#0F1A2E',
 }
 
 // ─── Section title ────────────────────────────────────────────────────────────
 
-function SectionTitle({ children, aside }: { children: React.ReactNode; aside?: React.ReactNode }) {
+function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      marginBottom: 14,
+      fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+      textTransform: 'uppercase', color: C.textMuted,
+      paddingBottom: 10, marginBottom: 12,
+      borderBottom: `1px solid ${C.border}`,
     }}>
-      <div style={{
-        fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
-        textTransform: 'uppercase', color: C.textMuted,
-      }}>
-        {children}
-      </div>
-      {aside && <div>{aside}</div>}
+      {children}
     </div>
   )
 }
 
-// ─── Editable KPI (used in budget breakdown row) ──────────────────────────────
+// ─── ProjEdits type ───────────────────────────────────────────────────────────
 
 interface ProjEdits {
   budget?:        number
@@ -251,6 +248,7 @@ interface ProjEdits {
   expenses?:     Record<number, { description?: string; amountNet?: number; tipo?: 'boleta' | 'factura'; paid?: boolean }>
   observations?: string
 }
+
 async function loadProjEdits(id: number): Promise<ProjEdits> {
   try {
     const res = await fetch(`/api/edits/${id}`)
@@ -267,163 +265,41 @@ async function saveProjEdits(id: number, edits: ProjEdits) {
     })
   } catch {}
 }
+
 type EditField = 'budget' | 'egresos' | 'gross'
 
-// Compact budget card used in the breakdown row
-function BudgetCard({
+// ─── Editable KPI card ────────────────────────────────────────────────────────
+
+function EditableKpi({
   label, value, color, isEditing, isOverridden, inputVal,
   onStartEdit, onInputChange, onCommit, onCancel, onReset,
 }: {
-  label: string; value: number | null; color?: string
+  label: string; value: number | null; color: string
   isEditing: boolean; isOverridden: boolean; inputVal: string
   onStartEdit: (v: number | null) => void
   onInputChange: (v: string) => void
   onCommit: () => void; onCancel: () => void; onReset: () => void
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Select all text the moment edit mode activates — prevents cursor-at-end with giant numbers
   useEffect(() => {
     if (isEditing) inputRef.current?.select()
   }, [isEditing])
-
-  const fg = color ?? C.textPrimary
 
   return (
     <div
       onClick={() => { if (!isEditing) onStartEdit(value) }}
       style={{
-        background: isEditing ? '#FFFBF0' : C.card,
-        border: `1.5px solid ${isEditing ? C.orange : C.border}`,
-        borderRadius: 10, padding: '14px 16px',
-        cursor: 'pointer', transition: 'border-color 0.1s',
-        flex: 1,
+        background: C.card,
+        border: `1px solid ${isEditing ? C.orange : C.border}`,
+        borderRadius: 10, padding: '14px 16px', cursor: 'pointer',
+        transition: 'border-color 0.1s',
       }}
     >
       <div style={{
         fontSize: 9, fontWeight: 700, letterSpacing: '0.09em',
-        textTransform: 'uppercase', color: C.textMuted, marginBottom: 6,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
-        <span>{label}</span>
-        {isOverridden && (
-          <span
-            onClick={e => { e.stopPropagation(); onReset() }}
-            title="Restaurar valor original"
-            style={{ cursor: 'pointer', color: C.orange, fontSize: 13 }}
-          >↺</span>
-        )}
-      </div>
-      {isEditing ? (
-        <input
-          ref={inputRef} autoFocus value={inputVal}
-          onChange={e => onInputChange(e.target.value)}
-          onBlur={onCommit}
-          onKeyDown={e => { if (e.key === 'Enter') onCommit(); if (e.key === 'Escape') onCancel() }}
-          style={{
-            width: '100%', boxSizing: 'border-box',
-            fontSize: 16, fontWeight: 700, color: fg,
-            fontVariantNumeric: 'tabular-nums',
-            border: 'none', outline: 'none', background: 'transparent',
-            padding: 0, lineHeight: 1,
-          }}
-        />
-      ) : (
-        <>
-          <div style={{ fontSize: 16, fontWeight: 700, color: fg, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
-            {fmtCLP(value)}
-          </div>
-          <div style={{ fontSize: 9, color: C.textMuted, marginTop: 5, opacity: 0.5 }}>✎ editar</div>
-        </>
-      )}
-    </div>
-  )
-}
-
-// ─── Active edit types ────────────────────────────────────────────────────────
-
-type ActiveEdit =
-  | { kind: 'kpi';       field: EditField }
-  | { kind: 'retention' }
-  | { kind: 'ep';        idx: number; col: 'label' | 'amount' }
-  | { kind: 'expense';   idx: number; col: 'description' | 'amountNet' }
-  | { kind: 'obs' }
-  | null
-
-function EditableCell({
-  value, isEditing, inputVal, onStart, onChange, onCommit, onCancel,
-  align = 'left', color,
-}: {
-  value: string; isEditing: boolean; inputVal: string
-  onStart: () => void; onChange: (v: string) => void
-  onCommit: () => void; onCancel: () => void
-  align?: 'left' | 'right'; color?: string
-}) {
-  return (
-    <td
-      onClick={() => { if (!isEditing) onStart() }}
-      style={{ ...TD, textAlign: align, cursor: 'pointer', color: color ?? C.textPrimary }}
-    >
-      {isEditing ? (
-        <input
-          autoFocus value={inputVal}
-          onChange={e => onChange(e.target.value)}
-          onBlur={onCommit}
-          onKeyDown={e => { if (e.key === 'Enter') onCommit(); if (e.key === 'Escape') onCancel() }}
-          style={{
-            width: '100%', boxSizing: 'border-box',
-            border: `1.5px solid ${C.orange}`, borderRadius: 5,
-            padding: '4px 7px', fontSize: 13, outline: 'none',
-            background: '#FFFBF0', color: C.textPrimary,
-          }}
-        />
-      ) : (
-        <span style={{
-          display: 'flex', alignItems: 'center', minHeight: 20, gap: 5,
-          justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
-        }}>
-          {align === 'right' && <span style={{ fontSize: 9, color: C.textMuted, opacity: 0.4 }}>✎</span>}
-          <span>{value || '—'}</span>
-          {align !== 'right' && <span style={{ fontSize: 9, color: C.textMuted, opacity: 0.4 }}>✎</span>}
-        </span>
-      )}
-    </td>
-  )
-}
-
-// ─── Hero metric (large, inline-editable) ────────────────────────────────────
-
-function HeroMetric({
-  label, value, hint, color, editable, isEditing, isOverridden, inputVal,
-  onStartEdit, onInputChange, onCommit, onCancel, onReset,
-  borderRight,
-}: {
-  label: string; value: number | null; hint: string; color: string
-  editable: boolean; isEditing: boolean; isOverridden: boolean; inputVal: string
-  onStartEdit: () => void; onInputChange: (v: string) => void
-  onCommit: () => void; onCancel: () => void; onReset: () => void
-  borderRight?: boolean
-}) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  useEffect(() => {
-    if (isEditing) inputRef.current?.select()
-  }, [isEditing])
-
-  return (
-    <div
-      onClick={() => { if (editable && !isEditing) onStartEdit() }}
-      style={{
-        padding: '18px 20px',
-        borderRight: borderRight ? `1px solid ${C.border}` : 'none',
-        cursor: editable ? 'pointer' : 'default',
-        background: isEditing ? '#FFFBF0' : 'transparent',
-        transition: 'background 0.12s',
-        minWidth: 0,
-      }}
-      onMouseEnter={e => { if (editable && !isEditing) (e.currentTarget as HTMLElement).style.background = '#F4F6F9' }}
-      onMouseLeave={e => { if (!isEditing) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
-    >
-      <div style={{
-        fontSize: 9, fontWeight: 700, letterSpacing: '0.09em',
-        textTransform: 'uppercase', color: C.textMuted, marginBottom: 7,
+        textTransform: 'uppercase', color: C.textMuted, marginBottom: 8,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <span>{label}</span>
@@ -437,33 +313,57 @@ function HeroMetric({
       </div>
       {isEditing ? (
         <input
-          ref={inputRef} autoFocus value={inputVal}
+          ref={inputRef}
+          autoFocus
+          value={inputVal}
           onChange={e => onInputChange(e.target.value)}
+          onFocus={e => e.target.select()}
           onBlur={onCommit}
           onKeyDown={e => { if (e.key === 'Enter') onCommit(); if (e.key === 'Escape') onCancel() }}
           style={{
             width: '100%', boxSizing: 'border-box',
-            fontSize: 22, fontWeight: 800, color,
+            fontSize: 17, fontWeight: 700, color,
             fontVariantNumeric: 'tabular-nums',
             border: 'none', outline: 'none', background: 'transparent',
             padding: 0, lineHeight: 1,
           }}
         />
       ) : (
-        <div style={{ fontSize: 22, fontWeight: 800, color, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
-          {fmtCLP(value)}
-        </div>
+        <>
+          <div style={{ fontSize: 17, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+            {fmtCLP(value)}
+          </div>
+          <div style={{ fontSize: 9, color: C.textMuted, marginTop: 5, opacity: 0.6 }}>
+            ✎ editar
+          </div>
+        </>
       )}
-      <div style={{ fontSize: 9, color: C.textMuted, marginTop: 6, opacity: 0.6 }}>
-        {editable ? (isOverridden ? '✎ editado' : '✎ editar') : hint}
+    </div>
+  )
+}
+
+// ─── Static KPI card ──────────────────────────────────────────────────────────
+
+function StaticKpi({ label, value, color, hint }: { label: string; value: number | null; color: string; hint: string }) {
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 16px' }}>
+      <div style={{
+        fontSize: 9, fontWeight: 700, letterSpacing: '0.09em',
+        textTransform: 'uppercase', color: C.textMuted, marginBottom: 8,
+      }}>
+        {label}
       </div>
+      <div style={{ fontSize: 17, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+        {fmtCLP(value)}
+      </div>
+      <div style={{ fontSize: 9, color: C.textMuted, marginTop: 5, opacity: 0.5 }}>{hint}</div>
     </div>
   )
 }
 
 // ─── Retention KPI card ───────────────────────────────────────────────────────
 
-function RetentionCard({
+function RetentionKpi({
   pct, amount, tipo, isEditing, inputVal, isOverridden,
   onStartEdit, onInputChange, onCommit, onCancel, onReset, onSetTipo,
 }: {
@@ -475,9 +375,9 @@ function RetentionCard({
 }) {
   return (
     <div style={{
-      background: isEditing ? '#FFFBF0' : C.card,
-      border: `1.5px solid ${isEditing ? C.orange : C.border}`,
-      borderRadius: 10, padding: '14px 16px', flex: 1,
+      background: C.card,
+      border: `1px solid ${isEditing ? C.orange : C.border}`,
+      borderRadius: 10, padding: '14px 16px',
     }}>
       <div style={{
         fontSize: 9, fontWeight: 700, letterSpacing: '0.09em',
@@ -487,7 +387,7 @@ function RetentionCard({
         <span>Retención SII</span>
         {isOverridden && (
           <span onClick={onReset} title="Restaurar"
-            style={{ cursor: 'pointer', color: C.orange, fontSize: 13 }}>↺</span>
+            style={{ cursor: 'pointer', color: C.orange, fontSize: 13, lineHeight: 1 }}>↺</span>
         )}
       </div>
       <div style={{ display: 'inline-flex', borderRadius: 20, overflow: 'hidden', border: `1px solid ${C.border}`, marginBottom: 10 }}>
@@ -508,32 +408,89 @@ function RetentionCard({
           <input
             autoFocus value={inputVal}
             onChange={e => onInputChange(e.target.value)}
+            onFocus={e => e.target.select()}
             onBlur={onCommit}
             onKeyDown={e => { if (e.key === 'Enter') onCommit(); if (e.key === 'Escape') onCancel() }}
             placeholder="ej: 15.25"
             style={{
               width: '100%', boxSizing: 'border-box',
-              fontSize: 16, fontWeight: 700, color: C.textMuted,
+              fontSize: 17, fontWeight: 700, color: C.textMuted,
               border: 'none', outline: 'none', background: 'transparent',
-              padding: 0, lineHeight: 1, fontVariantNumeric: 'tabular-nums',
+              padding: 0, lineHeight: 1,
             }}
           />
           <div style={{ fontSize: 9, color: C.textMuted, marginTop: 4, opacity: 0.6 }}>Ingresa el porcentaje (sin %)</div>
         </div>
       ) : (
         <div onClick={onStartEdit} style={{ cursor: 'pointer' }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: C.textMuted, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: C.textMuted, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
             {pct != null ? `${pct.toFixed(2)}%` : '—'}
           </div>
           {amount != null && (
-            <div style={{ fontSize: 12, color: C.textSec, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
+            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
               {fmtCLP(amount)}
             </div>
           )}
-          <div style={{ fontSize: 9, color: C.textMuted, marginTop: 3, opacity: 0.5 }}>✎ editar</div>
+          <div style={{ fontSize: 9, color: C.textMuted, marginTop: 3, opacity: 0.6 }}>✎ editar</div>
         </div>
       )}
     </div>
+  )
+}
+
+// ─── Active edit types ────────────────────────────────────────────────────────
+
+type ActiveEdit =
+  | { kind: 'kpi';       field: EditField }
+  | { kind: 'retention' }
+  | { kind: 'ep';        idx: number; col: 'label' | 'amount' }
+  | { kind: 'expense';   idx: number; col: 'description' | 'amountNet' }
+  | { kind: 'obs' }
+  | null
+
+// ─── Editable table cell ──────────────────────────────────────────────────────
+
+function EditableCell({
+  value, isEditing, inputVal, onStart, onChange, onCommit, onCancel,
+  align = 'left', color, numeric = false,
+}: {
+  value: string; isEditing: boolean; inputVal: string
+  onStart: () => void; onChange: (v: string) => void
+  onCommit: () => void; onCancel: () => void
+  align?: 'left' | 'right'; color?: string; numeric?: boolean
+}) {
+  return (
+    <td
+      onClick={() => { if (!isEditing) onStart() }}
+      style={{ ...TD, textAlign: align, cursor: 'pointer', color: color ?? C.textPrimary }}
+    >
+      {isEditing ? (
+        <input
+          autoFocus
+          value={inputVal}
+          onChange={e => onChange(e.target.value)}
+          // Always select-all on focus — crucial for numeric fields with large pre-filled values
+          onFocus={e => e.target.select()}
+          onBlur={onCommit}
+          onKeyDown={e => { if (e.key === 'Enter') onCommit(); if (e.key === 'Escape') onCancel() }}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            border: `1px solid ${C.orange}`, borderRadius: 4,
+            padding: '3px 6px', fontSize: 12, outline: 'none', background: 'white',
+            fontVariantNumeric: numeric ? 'tabular-nums' : 'normal',
+          }}
+        />
+      ) : (
+        <span style={{
+          display: 'flex', alignItems: 'center', minHeight: 20, gap: 5,
+          justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
+        }}>
+          {align === 'right' && <span style={{ fontSize: 9, color: C.textMuted, opacity: 0.45 }}>✎</span>}
+          <span>{value || '—'}</span>
+          {align !== 'right' && <span style={{ fontSize: 9, color: C.textMuted, opacity: 0.45 }}>✎</span>}
+        </span>
+      )}
+    </td>
   )
 }
 
@@ -541,7 +498,7 @@ function RetentionCard({
 
 function Skeleton() {
   return (
-    <div style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: 14 }}>
       {[240, 180, 120, 200, 150, 180].map((w, i) => (
         <div key={i} style={{
           height: 14, width: w, maxWidth: '100%',
@@ -584,8 +541,8 @@ function DetailPanel({
   const [edits,    setEdits]    = useState<ProjEdits>({})
   const [active,   setActive]   = useState<ActiveEdit>(null)
   const [inputVal, setInputVal] = useState('')
-  const [budgetOpen, setBudgetOpen] = useState(false)
 
+  // Stale-flag prevents async load from overwriting in-progress user edits
   useEffect(() => {
     let stale = false
     setActive(null)
@@ -596,7 +553,7 @@ function DetailPanel({
     return () => { stale = true }
   }, [detail.id])
 
-  // Sum uses edited amountNet when present
+  // Uses edited amountNet per row so the KPI updates live as expenses are edited
   const totalEgresosCalc = detail.expenses
     .filter(e => !e.isSection)
     .reduce((s, e, i) => {
@@ -645,7 +602,7 @@ function DetailPanel({
     } else if (active.kind === 'expense') {
       const expEdits = { ...(edits.expenses ?? {}) }
       const cur = { ...(expEdits[active.idx] ?? {}) }
-      if      (active.col === 'description') { cur.description  = inputVal || undefined }
+      if      (active.col === 'description') { cur.description = inputVal || undefined }
       else if (active.col === 'amountNet')   { const n = toNum(inputVal); if (!isNaN(n)) cur.amountNet = n }
       expEdits[active.idx] = cur
       persist({ ...edits, expenses: expEdits })
@@ -656,10 +613,16 @@ function DetailPanel({
     setActive(null)
   }
 
-  function resetField(field: EditField) { const next = { ...edits }; delete next[field]; persist(next) }
+  function resetField(field: EditField) {
+    const next = { ...edits }
+    delete next[field]
+    persist(next)
+  }
   function resetRetention() {
     const next = { ...edits }
-    delete next.retentionPct; delete next.retentionTipo; persist(next)
+    delete next.retentionPct
+    delete next.retentionTipo
+    persist(next)
   }
   function setRetentionTipo(tipo: 'boleta' | 'factura' | null) {
     const next = { ...edits }
@@ -705,6 +668,7 @@ function DetailPanel({
     ? Math.round(grossVal * retentionPct / 100)
     : (detail.budget?.retention ?? null)
 
+  // Líquido: explicit override > gross − retention > Excel net
   const budget = edits.budget ??
     (grossVal != null && retentionVal != null ? grossVal - retentionVal : null) ??
     detail.budget?.net ?? null
@@ -713,6 +677,7 @@ function DetailPanel({
 
   const observations = edits.observations !== undefined ? edits.observations : (detail.observations ?? '')
 
+  // Neto always computed to avoid #¡REF! errors from Excel
   const neto       = budget != null && egresos != null ? budget - egresos : null
   const marginCalc = budget != null && budget > 0 && neto != null ? neto / budget : null
   const costoVenta = budget != null && budget > 0 && egresos != null ? egresos / budget : null
@@ -729,74 +694,48 @@ function DetailPanel({
   }, 0)
   const hasExpTipos = detail.expenses.some((e, i) => !e.isSection && (edits.expenses?.[i]?.tipo) != null)
 
-  const paidCount = detail.eps.filter((ep, i) => isEpPaid(ep, i)).length
-  const totalEps  = detail.eps.length
+  const kpiProps = (field: EditField, value: number | null, color: string, label: string) => ({
+    label, value, color,
+    isEditing:     active?.kind === 'kpi' && active.field === field,
+    isOverridden:  edits[field] != null,
+    inputVal:      active?.kind === 'kpi' && active.field === field ? inputVal : '',
+    onStartEdit:   (v: number | null) => startEdit({ kind: 'kpi', field }, v != null ? String(Math.round(v)) : ''),
+    onInputChange: setInputVal,
+    onCommit:      commitEdit,
+    onCancel:      () => setActive(null),
+    onReset:       () => resetField(field),
+  })
 
-  // Margin color
-  const marginColor = marginCalc == null
-    ? C.textMuted
-    : marginCalc >= 0.3 ? C.success
-    : marginCalc >= 0.1 ? C.warning
-    : C.danger
+  // Ref for the analysis-table egresos input (to call select() there too)
+  const analysisEgresosRef = useRef<HTMLInputElement>(null)
+  const isEditingAnalysisEgresos = active?.kind === 'kpi' && active.field === 'egresos'
+  useEffect(() => {
+    if (isEditingAnalysisEgresos) analysisEgresosRef.current?.select()
+  }, [isEditingAnalysisEgresos])
 
   return (
-    <div style={{ maxWidth: 960 }}>
+    <div style={{ padding: '28px 32px 40px', maxWidth: 900 }}>
 
-      {/* ── Project header ───────────────────────────────────────────────── */}
-      <div style={{
-        padding: '22px 28px 18px',
-        borderBottom: `1px solid ${C.border}`,
-      }}>
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      <div style={{ paddingBottom: 20, marginBottom: 24, borderBottom: `1px solid ${C.border}` }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-
-          <div style={{ minWidth: 0, flex: 1 }}>
-            {/* Tags */}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
-              <span style={{
-                fontFamily: 'monospace', fontSize: 11, fontWeight: 700,
-                color: C.textMuted, letterSpacing: '0.06em',
-              }}>
-                #{detail.id}
-              </span>
-              {detail.scope && (
-                <span style={{
-                  fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
-                  padding: '2px 9px', borderRadius: 20,
-                  background: detail.scope === 'Público' ? '#EFF6FF' : '#F0FDF4',
-                  color: detail.scope === 'Público' ? '#1D4ED8' : C.success,
-                  border: `1px solid ${detail.scope === 'Público' ? '#BFDBFE' : C.successBorder}`,
-                }}>
-                  {detail.scope}
-                </span>
-              )}
-              {detail.managementType && (
-                <span style={{
-                  fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
-                  padding: '2px 9px', borderRadius: 20,
-                  background: C.listBg, color: C.textSec, border: `1px solid ${C.border}`,
-                }}>
-                  {gestionLabel(detail.managementType)}
-                </span>
-              )}
-            </div>
-
-            {/* Name */}
-            <h2 style={{ margin: '0 0 6px', fontSize: 21, fontWeight: 700, color: C.textPrimary, lineHeight: 1.25 }}>
-              {detail.name}
-            </h2>
-
-            {/* Client */}
-            <div style={{ fontSize: 14, color: C.textSec }}>{detail.client}</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 12, color: C.textMuted, marginBottom: 6 }}>#{detail.id}</div>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.textPrimary, lineHeight: 1.3 }}>{detail.name}</h2>
+            <div style={{ fontSize: 14, color: C.textSec, marginTop: 6 }}>{detail.client}</div>
+            {(detail.scope || detail.managementType) && (
+              <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>
+                {[detail.scope, gestionLabel(detail.managementType)].filter(Boolean).join(' · ')}
+              </div>
+            )}
           </div>
-
-          {/* Status toggle */}
           <div style={{ display: 'flex', gap: 4, flexShrink: 0, marginTop: 2 }}>
             {(['active', 'finalized'] as const).map(s => {
-              const isOn  = currentStatus === s
+              const isOn = currentStatus === s
               const color = s === 'active' ? C.orange : C.success
               return (
                 <button key={s} onClick={() => onStatusChange(s)} style={{
-                  padding: '5px 13px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+                  padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
                   border: `1px solid ${isOn ? color : C.border}`,
                   background: isOn ? color : 'transparent',
                   color: isOn ? '#fff' : C.textMuted,
@@ -810,479 +749,360 @@ function DetailPanel({
         </div>
       </div>
 
-      {/* ── Financial hero ────────────────────────────────────────────────── */}
-      <div style={{ background: C.heroBg, borderBottom: `1px solid ${C.border}` }}>
-
-        {/* 4 main metrics */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)' }}>
-          {/* Líquido — editable */}
-          <HeroMetric
-            label="Presupuesto líquido"
-            value={budget}
-            hint="∑ bruto − retención"
-            color={C.textPrimary}
-            editable
-            isEditing={active?.kind === 'kpi' && active.field === 'budget'}
-            isOverridden={edits.budget != null}
-            inputVal={active?.kind === 'kpi' && active.field === 'budget' ? inputVal : ''}
-            onStartEdit={() => startEdit({ kind: 'kpi', field: 'budget' }, budget != null ? String(Math.round(budget)) : '')}
-            onInputChange={setInputVal}
-            onCommit={commitEdit}
-            onCancel={() => setActive(null)}
-            onReset={() => resetField('budget')}
-            borderRight
-          />
-          {/* Cobrado */}
-          <HeroMetric
-            label="Cobrado"
-            value={pagadoCalc}
-            hint={`${paidCount}/${totalEps} EPs pagados`}
-            color={pagadoCalc > 0 ? C.success : C.textMuted}
-            editable={false}
-            isEditing={false}
-            isOverridden={false}
-            inputVal=""
-            onStartEdit={() => {}}
-            onInputChange={() => {}}
-            onCommit={() => {}}
-            onCancel={() => {}}
-            onReset={() => {}}
-            borderRight
-          />
-          {/* Egresos — editable */}
-          <HeroMetric
-            label="Egresos"
-            value={egresos}
-            hint="∑ gastos del proyecto"
-            color={egresos != null && egresos > 0 ? C.danger : C.textMuted}
-            editable
-            isEditing={active?.kind === 'kpi' && active.field === 'egresos'}
-            isOverridden={edits.egresos != null}
-            inputVal={active?.kind === 'kpi' && active.field === 'egresos' ? inputVal : ''}
-            onStartEdit={() => startEdit({ kind: 'kpi', field: 'egresos' }, egresos != null ? String(Math.round(egresos)) : '')}
-            onInputChange={setInputVal}
-            onCommit={commitEdit}
-            onCancel={() => setActive(null)}
-            onReset={() => resetField('egresos')}
-            borderRight
-          />
-          {/* Neto */}
-          <HeroMetric
-            label="Neto Q4"
-            value={neto}
-            hint="presupuesto − egresos"
-            color={neto == null ? C.textMuted : neto >= 0 ? C.success : C.danger}
-            editable={false}
-            isEditing={false}
-            isOverridden={false}
-            inputVal=""
-            onStartEdit={() => {}}
-            onInputChange={() => {}}
-            onCommit={() => {}}
-            onCancel={() => {}}
-            onReset={() => {}}
-          />
-        </div>
-
-        {/* Margin bar + stats */}
-        <div style={{
-          padding: '10px 20px 14px',
-          borderTop: `1px solid ${C.border}`,
-          display: 'flex', alignItems: 'center', gap: 14,
-        }}>
-          <span style={{
-            fontSize: 9, fontWeight: 700, letterSpacing: '0.09em',
-            textTransform: 'uppercase', color: C.textMuted, flexShrink: 0, width: 52,
-          }}>
-            Margen
-          </span>
-          <div style={{ flex: 1, height: 7, background: C.border, borderRadius: 4, overflow: 'hidden' }}>
-            <div style={{
-              width: `${Math.max(0, Math.min(100, (marginCalc ?? 0) * 100))}%`,
-              height: '100%',
-              background: marginColor,
-              borderRadius: 4,
-              transition: 'width 0.5s ease',
-            }} />
-          </div>
-          <span style={{ fontSize: 16, fontWeight: 700, color: marginColor, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-            {marginCalc != null ? `${(marginCalc * 100).toFixed(1)}%` : '—'}
-          </span>
-          {costoVenta != null && (
-            <span style={{ fontSize: 11, color: C.textMuted, flexShrink: 0 }}>
-              Costo-venta {(costoVenta * 100).toFixed(1)}%
-            </span>
-          )}
-          {pendienteCalc > 0 && (
-            <span style={{
-              fontSize: 11, color: C.orange, fontWeight: 600, flexShrink: 0,
-              padding: '2px 10px', borderRadius: 20,
-              background: C.orangeFaint, border: `1px solid ${C.orangeBorder}`,
-              fontVariantNumeric: 'tabular-nums',
-            }}>
-              {fmtCLP(pendienteCalc)} pendiente
-            </span>
-          )}
-        </div>
+      {/* ── KPIs — desglose presupuesto ─────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
+        <EditableKpi {...kpiProps('gross', grossVal, C.textPrimary, 'Bruto')} />
+        <RetentionKpi
+          pct={retentionPct}
+          amount={retentionVal}
+          tipo={retentionTipo}
+          isEditing={active?.kind === 'retention'}
+          inputVal={active?.kind === 'retention' ? inputVal : ''}
+          isOverridden={edits.retentionPct != null || edits.retentionTipo != null}
+          onStartEdit={() => startEdit({ kind: 'retention' }, retentionPct != null ? String(retentionPct) : '')}
+          onInputChange={setInputVal}
+          onCommit={commitEdit}
+          onCancel={() => setActive(null)}
+          onReset={resetRetention}
+          onSetTipo={setRetentionTipo}
+        />
+        <EditableKpi {...kpiProps('budget', budget, C.textPrimary, 'Líquido')} />
       </div>
 
-      {/* ── Budget breakdown (collapsible) ───────────────────────────────── */}
-      <div style={{ borderBottom: `1px solid ${C.border}` }}>
-        <button
-          onClick={() => setBudgetOpen(o => !o)}
-          style={{
-            width: '100%', textAlign: 'left',
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '11px 28px',
-            background: 'transparent', border: 'none', cursor: 'pointer',
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-            textTransform: 'uppercase', color: C.textMuted,
-          }}
-        >
-          <span style={{
-            fontSize: 9, transition: 'transform 0.18s',
-            display: 'inline-block',
-            transform: budgetOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-          }}>▶</span>
-          Desglose presupuesto
-          {!budgetOpen && grossVal != null && (
-            <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 4, color: C.textSec, fontSize: 11 }}>
-              — Bruto {fmtCLP(grossVal)}
-              {retentionPct != null && <> · Ret. {retentionPct.toFixed(1)}%</>}
-              {retentionTipo && <> ({retentionTipo})</>}
-            </span>
-          )}
-        </button>
-        {budgetOpen && (
-          <div style={{ padding: '4px 28px 20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <BudgetCard
-                label="Bruto"
-                value={grossVal}
-                isEditing={active?.kind === 'kpi' && active.field === 'gross'}
-                isOverridden={edits.gross != null}
-                inputVal={active?.kind === 'kpi' && active.field === 'gross' ? inputVal : ''}
-                onStartEdit={v => startEdit({ kind: 'kpi', field: 'gross' }, v != null ? String(Math.round(v)) : '')}
-                onInputChange={setInputVal}
-                onCommit={commitEdit}
-                onCancel={() => setActive(null)}
-                onReset={() => resetField('gross')}
-              />
-              <span style={{ color: C.textMuted, fontSize: 18, fontWeight: 300, flexShrink: 0 }}>−</span>
-              <RetentionCard
-                pct={retentionPct}
-                amount={retentionVal}
-                tipo={retentionTipo}
-                isEditing={active?.kind === 'retention'}
-                inputVal={active?.kind === 'retention' ? inputVal : ''}
-                isOverridden={edits.retentionPct != null || edits.retentionTipo != null}
-                onStartEdit={() => startEdit({ kind: 'retention' }, retentionPct != null ? String(retentionPct) : '')}
-                onInputChange={setInputVal}
-                onCommit={commitEdit}
-                onCancel={() => setActive(null)}
-                onReset={resetRetention}
-                onSetTipo={setRetentionTipo}
-              />
-              <span style={{ color: C.textMuted, fontSize: 18, fontWeight: 300, flexShrink: 0 }}>=</span>
-              <BudgetCard
-                label="Líquido"
-                value={budget}
-                isEditing={active?.kind === 'kpi' && active.field === 'budget'}
-                isOverridden={edits.budget != null}
-                inputVal={active?.kind === 'kpi' && active.field === 'budget' ? inputVal : ''}
-                onStartEdit={v => startEdit({ kind: 'kpi', field: 'budget' }, v != null ? String(Math.round(v)) : '')}
-                onInputChange={setInputVal}
-                onCommit={commitEdit}
-                onCancel={() => setActive(null)}
-                onReset={() => resetField('budget')}
-              />
-            </div>
+      {/* ── KPIs — flujo de caja ────────────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 28 }}>
+        <StaticKpi label="Pagado"    value={pagadoCalc}    color={C.success} hint="∑ EPs pagados" />
+        <StaticKpi label="Pendiente" value={pendienteCalc} color={C.orange}  hint="∑ EPs pendientes" />
+        <EditableKpi {...kpiProps('egresos', egresos, C.danger, 'Egresos')} />
+      </div>
+
+      {/* ── EPs ─────────────────────────────────────────────────────────────── */}
+      <div style={{ marginBottom: 28 }}>
+        <SectionTitle>Estados de Pago ({detail.eps.length})</SectionTitle>
+        {detail.eps.length === 0 ? (
+          <p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Sin estados de pago registrados.</p>
+        ) : (
+          <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 380 }}>
+              <thead>
+                <tr style={{ background: C.listBg }}>
+                  <th style={TH}>Estado de Pago</th>
+                  <th style={{ ...TH, textAlign: 'right' }}>Monto</th>
+                  <th style={{ ...TH, textAlign: 'center', width: 130 }}>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.eps.map((ep, i) => {
+                  const d    = getEp(ep, i)
+                  const paid = isEpPaid(ep, i)
+                  return (
+                    <tr key={i} style={{ borderTop: i > 0 ? `1px solid ${C.border}` : 'none' }}>
+                      <EditableCell
+                        value={d.label} color={C.textPrimary}
+                        {...ec({ kind: 'ep', idx: i, col: 'label' }, d.label)}
+                      />
+                      <EditableCell
+                        value={d.amount != null ? fmtCLP(d.amount) : ''} align="right" color={C.textPrimary} numeric
+                        {...ec({ kind: 'ep', idx: i, col: 'amount' }, d.amount != null ? String(Math.round(d.amount)) : '')}
+                      />
+                      <td style={{ ...TD, textAlign: 'center' }}>
+                        <button
+                          onClick={() => toggleEpPaid(i)}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            padding: '5px 14px', borderRadius: 20, cursor: 'pointer',
+                            fontSize: 11, fontWeight: 700, transition: 'all 0.15s',
+                            color: paid ? C.success : C.orange,
+                            background: paid ? C.successBg : C.orangeFaint,
+                            border: `1px solid ${paid ? C.successBorder : C.orangeBorder}`,
+                          }}
+                        >
+                          {paid ? '✓ Pagado' : 'Pendiente'}
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
 
-      {/* ── Content sections ─────────────────────────────────────────────── */}
-      <div style={{ padding: '26px 28px 44px', display: 'flex', flexDirection: 'column', gap: 32 }}>
-
-        {/* EPs */}
-        <div>
-          <SectionTitle
-            aside={
-              totalEps > 0 ? (
-                <span style={{
-                  fontSize: 11, color: paidCount === totalEps ? C.success : C.orange,
-                  fontWeight: 600,
-                }}>
-                  {paidCount}/{totalEps} pagado{paidCount !== 1 ? 's' : ''}
-                </span>
-              ) : undefined
-            }
-          >
-            Estados de Pago
-            {totalEps > 0 && (
-              <span style={{ marginLeft: 6, color: C.textSec, fontWeight: 400 }}>
-                ({totalEps})
-              </span>
-            )}
-          </SectionTitle>
-
-          {detail.eps.length === 0 ? (
-            <p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Sin estados de pago registrados.</p>
-          ) : (
-            <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: C.listBg }}>
-                    <th style={TH}>Estado de Pago</th>
-                    <th style={{ ...TH, textAlign: 'right' }}>Monto</th>
-                    <th style={{ ...TH, textAlign: 'center', width: 130 }}>Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detail.eps.map((ep, i) => {
-                    const d    = getEp(ep, i)
-                    const paid = isEpPaid(ep, i)
+      {/* ── Egresos ─────────────────────────────────────────────────────────── */}
+      {detail.expenses.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <SectionTitle>Egresos ({detail.expenses.filter(e => !e.isSection).length})</SectionTitle>
+          <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: C.listBg }}>
+                  <th style={TH}>Descripción</th>
+                  <th style={{ ...TH, textAlign: 'right' }}>Monto Neto</th>
+                  <th style={{ ...TH, textAlign: 'center', width: 150 }}>Tipo</th>
+                  <th style={{ ...TH, textAlign: 'right' }}>Con Impuesto</th>
+                  <th style={{ ...TH, textAlign: 'center', width: 110 }}>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.expenses.map((e, i) => {
+                  // Section / category header
+                  if (e.isSection) {
                     return (
-                      <tr key={i} style={{
-                        borderTop: `1px solid ${C.border}`,
-                        background: paid ? C.successBg : 'transparent',
-                      }}>
-                        <EditableCell value={d.label} color={C.textPrimary}
-                          {...ec({ kind: 'ep', idx: i, col: 'label'  }, d.label)} />
-                        <EditableCell value={d.amount != null ? fmtCLP(d.amount) : ''} align="right" color={C.textPrimary}
-                          {...ec({ kind: 'ep', idx: i, col: 'amount' }, d.amount != null ? String(Math.round(d.amount)) : '')} />
-                        <td style={{ ...TD, textAlign: 'center' }}>
-                          <button
-                            onClick={() => toggleEpPaid(i)}
-                            style={{
-                              display: 'inline-flex', alignItems: 'center', gap: 5,
-                              padding: '5px 14px', borderRadius: 20, cursor: 'pointer',
-                              fontSize: 11, fontWeight: 700, transition: 'all 0.15s',
-                              color: paid ? C.success : C.orange,
-                              background: paid ? 'rgba(22,163,74,0.1)' : C.orangeFaint,
-                              border: `1px solid ${paid ? C.successBorder : C.orangeBorder}`,
-                            }}
-                          >
-                            {paid ? '✓ Pagado' : '● Pendiente'}
-                          </button>
+                      <tr key={i} style={{ background: C.listBg, borderTop: `1px solid ${C.border}` }}>
+                        <td
+                          colSpan={e.amountNet !== null ? 1 : 5}
+                          style={{
+                            ...TD, fontWeight: 700, fontSize: 11,
+                            color: C.textPrimary, letterSpacing: '0.05em',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          {e.description}
                         </td>
+                        {e.amountNet !== null && (
+                          <>
+                            <td style={{
+                              ...TD, textAlign: 'right', fontWeight: 700,
+                              color: C.textSec, fontVariantNumeric: 'tabular-nums',
+                            }}>
+                              {fmtCLP(e.amountNet)}
+                            </td>
+                            <td style={TD} /><td style={TD} /><td style={TD} />
+                          </>
+                        )}
                       </tr>
                     )
-                  })}
-                </tbody>
-                {totalEps > 0 && (
-                  <tfoot>
-                    <tr style={{ borderTop: `2px solid ${C.border}`, background: C.listBg }}>
-                      <td style={{ ...TD, fontWeight: 700, color: C.textSec }}>Total</td>
+                  }
+
+                  // Leaf expense row
+                  const ov      = edits.expenses?.[i] ?? {}
+                  const desc    = ov.description ?? e.description ?? ''
+                  const net     = ov.amountNet   ?? e.amountNet   ?? null
+                  const tipo    = ov.tipo ?? null
+                  const withTax = net != null && tipo != null
+                    ? Math.round(net * (tipo === 'factura' ? 1.19 : 1.153))
+                    : null
+                  const isPaid  = ov.paid === true
+
+                  return (
+                    <tr key={i} style={{ borderTop: `1px solid ${C.border}` }}>
+                      <EditableCell
+                        value={String(desc)}
+                        {...ec({ kind: 'expense', idx: i, col: 'description' }, String(desc))}
+                      />
+                      <EditableCell
+                        value={fmtCLP(net)} align="right" color={C.danger} numeric
+                        {...ec({ kind: 'expense', idx: i, col: 'amountNet' }, net != null ? String(Math.round(net)) : '')}
+                      />
+                      <td style={{ ...TD, textAlign: 'center' }}>
+                        <div style={{
+                          display: 'inline-flex', borderRadius: 20, overflow: 'hidden',
+                          border: `1px solid ${C.border}`,
+                        }}>
+                          {(['factura', 'boleta'] as const).map(t => (
+                            <button
+                              key={t}
+                              onClick={() => setExpTipo(i, tipo === t ? null : t)}
+                              style={{
+                                padding: '4px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                                border: 'none', outline: 'none',
+                                color: tipo === t ? '#fff' : C.textMuted,
+                                background: tipo === t
+                                  ? (t === 'factura' ? '#1C2D5A' : C.textSec)
+                                  : 'transparent',
+                                transition: 'all 0.12s',
+                              }}
+                            >
+                              {t === 'factura' ? 'Factura' : 'Boleta'}
+                            </button>
+                          ))}
+                        </div>
+                      </td>
                       <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                        <span style={{ color: C.success, fontWeight: 600, marginRight: 8 }}>
-                          {fmtCLP(pagadoCalc)}
-                        </span>
-                        {pendienteCalc > 0 && (
-                          <span style={{ color: C.orange, fontWeight: 600, fontSize: 12 }}>
-                            + {fmtCLP(pendienteCalc)} pend.
+                        {withTax != null ? (
+                          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 5 }}>
+                            <span style={{ color: C.textSec }}>{fmtCLP(withTax)}</span>
+                            <span style={{ fontSize: 9, color: C.textMuted, opacity: 0.6 }}>
+                              ×{tipo === 'factura' ? '1.19' : '1.153'}
+                            </span>
                           </span>
+                        ) : (
+                          <span style={{ color: C.textMuted }}>—</span>
                         )}
                       </td>
-                      <td style={TD} />
+                      <td style={{ ...TD, textAlign: 'center' }}>
+                        <button
+                          onClick={() => {
+                            const expEdits = { ...(edits.expenses ?? {}) }
+                            expEdits[i] = { ...(expEdits[i] ?? {}), paid: !isPaid }
+                            persist({ ...edits, expenses: expEdits })
+                          }}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
+                            fontSize: 11, fontWeight: 600, transition: 'all 0.15s',
+                            border: `1px solid ${isPaid ? C.successBorder : C.border}`,
+                            background: isPaid ? C.successBg : 'transparent',
+                            color: isPaid ? C.success : C.textMuted,
+                          }}
+                        >
+                          {isPaid ? '✓ Pagado' : 'Pendiente'}
+                        </button>
+                      </td>
                     </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
-          )}
+                  )
+                })}
+              </tbody>
+              <tfoot>
+                <tr style={{ background: C.listBg, borderTop: `2px solid ${C.border}` }}>
+                  <td style={{ ...TD, fontWeight: 700 }}>Total</td>
+                  <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: C.danger, fontVariantNumeric: 'tabular-nums' }}>
+                    {fmtCLP(totalEgresosCalc)}
+                  </td>
+                  <td style={TD} />
+                  <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: C.textSec, fontVariantNumeric: 'tabular-nums' }}>
+                    {hasExpTipos ? fmtCLP(totalWithTax) : '—'}
+                  </td>
+                  <td style={TD} />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
+      )}
 
-        {/* Egresos */}
-        {detail.expenses.length > 0 && (
-          <div>
-            <SectionTitle
-              aside={
-                <span style={{
-                  fontSize: 12, color: C.danger, fontWeight: 600,
-                  fontVariantNumeric: 'tabular-nums',
-                }}>
-                  {fmtCLP(totalEgresosCalc)}
-                </span>
-              }
-            >
-              Egresos
-              <span style={{ marginLeft: 6, color: C.textSec, fontWeight: 400 }}>
-                ({detail.expenses.filter(e => !e.isSection).length})
-              </span>
-            </SectionTitle>
+      {/* ── Análisis ─────────────────────────────────────────────────────────── */}
+      <div style={{ marginBottom: 28 }}>
+        <SectionTitle>Análisis</SectionTitle>
+        <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <tbody>
 
-            <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: C.listBg }}>
-                    <th style={TH}>Descripción</th>
-                    <th style={{ ...TH, textAlign: 'right' }}>Monto Neto</th>
-                    <th style={{ ...TH, textAlign: 'center', width: 150 }}>Tipo</th>
-                    <th style={{ ...TH, textAlign: 'right' }}>Con Impuesto</th>
-                    <th style={{ ...TH, textAlign: 'center', width: 110 }}>Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detail.expenses.map((e, i) => {
-                    if (e.isSection) {
-                      return (
-                        <tr key={i} style={{
-                          background: '#F1F4F8',
-                          borderTop: `1px solid ${C.border}`,
-                        }}>
-                          <td
-                            colSpan={e.amountNet !== null ? 1 : 5}
-                            style={{
-                              ...TD, fontWeight: 700, fontSize: 11,
-                              color: C.textSec, letterSpacing: '0.06em',
-                              textTransform: 'uppercase',
-                            }}
-                          >
-                            {e.description}
-                          </td>
-                          {e.amountNet !== null && (
-                            <>
-                              <td style={{
-                                ...TD, textAlign: 'right', fontWeight: 700,
-                                color: C.textSec, fontVariantNumeric: 'tabular-nums',
-                              }}>
-                                {fmtCLP(e.amountNet)}
-                              </td>
-                              <td style={TD} /><td style={TD} /><td style={TD} />
-                            </>
-                          )}
-                        </tr>
-                      )
-                    }
+              {/* Total Egresos — editable. Shows input right here so user doesn't need to scroll. */}
+              <tr style={{ background: C.listBg }}>
+                <td style={{ ...TD, color: C.textSec, width: '60%' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    Total Egresos
+                    {edits.egresos != null && (
+                      <span
+                        onClick={() => resetField('egresos')}
+                        title="Restaurar valor calculado desde tabla"
+                        style={{ cursor: 'pointer', color: C.orange, fontSize: 13, lineHeight: 1, opacity: 0.8 }}
+                      >↺</span>
+                    )}
+                  </span>
+                </td>
+                <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                  {isEditingAnalysisEgresos ? (
+                    <input
+                      ref={analysisEgresosRef}
+                      autoFocus
+                      value={inputVal}
+                      onChange={e => setInputVal(e.target.value)}
+                      onFocus={e => e.target.select()}
+                      onBlur={commitEdit}
+                      onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setActive(null) }}
+                      style={{
+                        width: '100%', textAlign: 'right', boxSizing: 'border-box',
+                        fontSize: 13, fontWeight: 500, color: C.danger,
+                        border: `1.5px solid ${C.orange}`, borderRadius: 5,
+                        padding: '3px 6px', outline: 'none', background: '#FFFBF0',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    />
+                  ) : (
+                    <span
+                      onClick={() => startEdit(
+                        { kind: 'kpi', field: 'egresos' },
+                        egresos != null ? String(Math.round(egresos)) : '0'
+                      )}
+                      title="Clic para editar"
+                      style={{
+                        cursor: 'text', color: C.danger, fontWeight: 500,
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        padding: '2px 4px', borderRadius: 4,
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(220,38,38,0.05)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      {fmtCLP(egresos)}
+                      <span style={{ fontSize: 9, color: C.textMuted, opacity: 0.45 }}>✎</span>
+                    </span>
+                  )}
+                </td>
+              </tr>
 
-                    const ov   = edits.expenses?.[i] ?? {}
-                    const desc = ov.description ?? e.description ?? ''
-                    const net  = ov.amountNet   ?? e.amountNet   ?? null
-                    const tipo = ov.tipo ?? null
-                    const withTax = net != null && tipo != null
-                      ? Math.round(net * (tipo === 'factura' ? 1.19 : 1.153))
-                      : null
-                    const isPaid = ov.paid === true
+              {/* Static rows */}
+              {([
+                {
+                  label: 'Neto Q4 Ingenieros',
+                  value: fmtCLP(neto),
+                  color: neto == null ? C.textSec : neto >= 0 ? C.success : C.danger,
+                  bold: true,
+                },
+                {
+                  label: 'Margen de Utilidad',
+                  value: marginCalc != null ? `${(marginCalc * 100).toFixed(1)}%` : '—',
+                  color: (marginCalc ?? 0) >= 0 ? C.success : C.danger,
+                  bold: true,
+                },
+                {
+                  label: 'Costo-Venta',
+                  value: costoVenta != null ? `${(costoVenta * 100).toFixed(1)}%` : '—',
+                  color: C.textSec,
+                  bold: false,
+                },
+              ] as { label: string; value: string; color: string; bold: boolean }[]).map((row, i) => (
+                <tr key={i} style={{ borderTop: `1px solid ${C.border}`, background: i % 2 === 0 ? C.card : C.listBg }}>
+                  <td style={{ ...TD, fontWeight: row.bold ? 600 : 400, color: C.textSec, width: '60%' }}>
+                    {row.label}
+                  </td>
+                  <td style={{
+                    ...TD, textAlign: 'right',
+                    fontWeight: row.bold ? 700 : 500, color: row.color,
+                    fontVariantNumeric: 'tabular-nums',
+                  }}>
+                    {row.value}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-                    return (
-                      <tr key={i} style={{
-                        borderTop: `1px solid ${C.border}`,
-                        background: isPaid ? C.successBg : 'transparent',
-                      }}>
-                        <EditableCell value={String(desc)}
-                          {...ec({ kind: 'expense', idx: i, col: 'description' }, String(desc))} />
-                        <EditableCell value={fmtCLP(net)} align="right" color={C.danger}
-                          {...ec({ kind: 'expense', idx: i, col: 'amountNet' }, net != null ? String(Math.round(net)) : '')} />
-                        <td style={{ ...TD, textAlign: 'center' }}>
-                          <div style={{
-                            display: 'inline-flex', borderRadius: 20, overflow: 'hidden',
-                            border: `1px solid ${C.border}`,
-                          }}>
-                            {(['factura', 'boleta'] as const).map(t => (
-                              <button
-                                key={t}
-                                onClick={() => setExpTipo(i, tipo === t ? null : t)}
-                                style={{
-                                  padding: '4px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                                  border: 'none', outline: 'none',
-                                  color: tipo === t ? '#fff' : C.textMuted,
-                                  background: tipo === t
-                                    ? (t === 'factura' ? '#1C2D5A' : C.textSec)
-                                    : 'transparent',
-                                  transition: 'all 0.12s',
-                                }}
-                              >
-                                {t === 'factura' ? 'Factura' : 'Boleta'}
-                              </button>
-                            ))}
-                          </div>
-                        </td>
-                        <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                          {withTax != null ? (
-                            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 5 }}>
-                              <span style={{ color: C.textSec }}>{fmtCLP(withTax)}</span>
-                              <span style={{ fontSize: 9, color: C.textMuted, opacity: 0.6 }}>
-                                ×{tipo === 'factura' ? '1.19' : '1.153'}
-                              </span>
-                            </span>
-                          ) : (
-                            <span style={{ color: C.textMuted }}>—</span>
-                          )}
-                        </td>
-                        <td style={{ ...TD, textAlign: 'center' }}>
-                          <button
-                            onClick={() => {
-                              const expEdits = { ...(edits.expenses ?? {}) }
-                              expEdits[i] = { ...(expEdits[i] ?? {}), paid: !isPaid }
-                              persist({ ...edits, expenses: expEdits })
-                            }}
-                            style={{
-                              display: 'inline-flex', alignItems: 'center', gap: 4,
-                              padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
-                              fontSize: 11, fontWeight: 600, transition: 'all 0.15s',
-                              border: `1px solid ${isPaid ? C.successBorder : C.border}`,
-                              background: isPaid ? 'rgba(22,163,74,0.1)' : 'transparent',
-                              color: isPaid ? C.success : C.textMuted,
-                            }}
-                          >
-                            {isPaid ? '✓ Pagado' : 'Pendiente'}
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr style={{ background: C.listBg, borderTop: `2px solid ${C.border}` }}>
-                    <td style={{ ...TD, fontWeight: 700, color: C.textSec }}>Total Egresos</td>
-                    <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: C.danger, fontVariantNumeric: 'tabular-nums' }}>
-                      {fmtCLP(totalEgresosCalc)}
-                    </td>
-                    <td style={TD} />
-                    <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: C.textSec, fontVariantNumeric: 'tabular-nums' }}>
-                      {hasExpTipos ? fmtCLP(totalWithTax) : '—'}
-                    </td>
-                    <td style={TD} />
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+      {/* ── Observaciones ────────────────────────────────────────────────────── */}
+      <div>
+        <SectionTitle>Observaciones</SectionTitle>
+        {active?.kind === 'obs' ? (
+          <textarea
+            autoFocus
+            value={inputVal}
+            onChange={e => setInputVal(e.target.value)}
+            onBlur={commitEdit}
+            onKeyDown={e => { if (e.key === 'Escape') setActive(null) }}
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              fontSize: 13, color: C.textSec, lineHeight: 1.7,
+              padding: '14px 16px', borderRadius: 8,
+              background: C.warningBg, border: `1px solid ${C.orange}`,
+              resize: 'vertical', minHeight: 72, outline: 'none',
+            }}
+          />
+        ) : (
+          <div
+            onClick={() => startEdit({ kind: 'obs' }, observations)}
+            style={{
+              fontSize: 13, lineHeight: 1.7, cursor: 'pointer',
+              padding: '14px 16px', borderRadius: 8,
+              color: observations ? C.textSec : C.textMuted,
+              background: C.warningBg, border: `1px solid ${C.warningBorder}`,
+            }}
+          >
+            {observations || '✎ Click para agregar observaciones...'}
           </div>
         )}
-
-        {/* Observations */}
-        <div>
-          <SectionTitle>Observaciones</SectionTitle>
-          {active?.kind === 'obs' ? (
-            <textarea
-              autoFocus value={inputVal}
-              onChange={e => setInputVal(e.target.value)}
-              onBlur={commitEdit}
-              onKeyDown={e => { if (e.key === 'Escape') setActive(null) }}
-              style={{
-                width: '100%', boxSizing: 'border-box',
-                fontSize: 13, color: C.textSec, lineHeight: 1.7,
-                padding: '14px 16px', borderRadius: 10,
-                background: C.warningBg, border: `1.5px solid ${C.orange}`,
-                resize: 'vertical', minHeight: 80, outline: 'none',
-              }}
-            />
-          ) : (
-            <div
-              onClick={() => startEdit({ kind: 'obs' }, observations)}
-              style={{
-                fontSize: 13, lineHeight: 1.7, cursor: 'pointer',
-                padding: '14px 16px', borderRadius: 10,
-                color: observations ? C.textSec : C.textMuted,
-                background: C.warningBg, border: `1px solid ${C.warningBorder}`,
-              }}
-            >
-              {observations || '✎ Click para agregar observaciones...'}
-            </div>
-          )}
-        </div>
-
       </div>
     </div>
   )
@@ -1298,8 +1118,8 @@ const SEL: React.CSSProperties = {
   cursor: 'pointer', flexShrink: 0,
 }
 
-type StatusF  = 'todos' | 'activos' | 'finalizados'
-type AmbitoF  = 'todos' | 'Público' | 'Privado'
+type StatusF = 'todos' | 'activos' | 'finalizados'
+type AmbitoF = 'todos' | 'Público' | 'Privado'
 
 // ─── Module ───────────────────────────────────────────────────────────────────
 
@@ -1313,8 +1133,8 @@ export function ProyectosModule({ projects }: Props) {
   const [detail, setDetail]         = useState<ProjectDetail | null>(null)
   const [loading, setLoading]       = useState(false)
 
-  const [statusF,  setStatusF]  = useState<StatusF>('todos')
-  const [ambitoF,  setAmbitoF]  = useState<AmbitoF>('todos')
+  const [statusF, setStatusF] = useState<StatusF>('todos')
+  const [ambitoF, setAmbitoF] = useState<AmbitoF>('todos')
 
   const [statusOverrides, setStatusOverrides] = useState<Record<number, 'active' | 'finalized'>>({})
 
@@ -1347,9 +1167,9 @@ export function ProyectosModule({ projects }: Props) {
   }, [projects, effectiveIsFinalized])
 
   const filtered = useMemo(() => projects.filter(p => {
-    if (statusF  === 'activos'     &&  effectiveIsFinalized(p.id)) return false
-    if (statusF  === 'finalizados' && !effectiveIsFinalized(p.id)) return false
-    if (ambitoF  !== 'todos' && p.scope !== ambitoF)               return false
+    if (statusF === 'activos'     &&  effectiveIsFinalized(p.id)) return false
+    if (statusF === 'finalizados' && !effectiveIsFinalized(p.id)) return false
+    if (ambitoF !== 'todos' && p.scope !== ambitoF)               return false
     return true
   }), [projects, statusF, ambitoF, effectiveIsFinalized])
 
@@ -1383,9 +1203,9 @@ export function ProyectosModule({ projects }: Props) {
           </div>
           <div style={{ display: 'flex', gap: isMobile ? 6 : 8, flexShrink: 0 }}>
             {([
-              { label: 'Total',   value: liveStats.total,     color: C.textPrimary, filter: 'todos'        as StatusF },
-              { label: 'Activos', value: liveStats.active,    color: C.orange,      filter: 'activos'      as StatusF },
-              { label: 'Fin.',    value: liveStats.finalized, color: C.success,     filter: 'finalizados'  as StatusF },
+              { label: 'Total',   value: liveStats.total,     color: C.textPrimary, filter: 'todos'       as StatusF },
+              { label: 'Activos', value: liveStats.active,    color: C.orange,      filter: 'activos'     as StatusF },
+              { label: 'Fin.',    value: liveStats.finalized, color: C.success,     filter: 'finalizados' as StatusF },
             ]).map(s => {
               const isActive = statusF === s.filter
               return (
