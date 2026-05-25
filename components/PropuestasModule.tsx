@@ -310,7 +310,6 @@ export function PropuestasModule() {
               </div>
             )}
             {filtered.map((p, i) => {
-              const fecha   = effectiveFecha(p)
               const status  = effectiveStatus(p)
               const badge   = tipoBadge(p.tipo)
               const firmado = status === 'firmado'
@@ -347,33 +346,14 @@ export function PropuestasModule() {
                   <div style={{ fontSize: 12, color: C.textSec, marginBottom: 6, lineHeight: 1.4 }}>{p.proyecto}</div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 11, color: C.textMuted }}>{p.comuna ?? '—'}</span>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      {editingDate === p.id ? (
-                        <input
-                          type="date"
-                          defaultValue={fecha ?? ''}
-                          autoFocus
-                          onBlur={e => { patchOverride(p.id, { fecha: e.target.value || undefined }); setEditingDate(null) }}
-                          style={{ fontSize: 11, border: `1px solid ${C.orange}`, borderRadius: 4, padding: '2px 6px' }}
-                        />
-                      ) : (
-                        <button onClick={() => setEditingDate(p.id)} style={{
-                          fontSize: 11, color: fecha ? C.textSec : C.textMuted,
-                          background: 'none', border: 'none', cursor: 'pointer',
-                          borderBottom: `1px dashed ${C.textMuted}`, padding: 0,
-                        }}>
-                          {fmtDate(fecha)}
-                        </button>
-                      )}
-                      <a
-                        href={p.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ fontSize: 11, color: C.orange, fontWeight: 600, textDecoration: 'none' }}
-                      >
-                        Ver PDF ↗
-                      </a>
-                    </div>
+                    <a
+                      href={p.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: 11, color: C.orange, fontWeight: 600, textDecoration: 'none' }}
+                    >
+                      Ver PDF ↗
+                    </a>
                   </div>
                 </div>
               )
@@ -389,7 +369,6 @@ export function PropuestasModule() {
                 <th style={TH}>Contraparte / Especialista</th>
                 <th style={TH}>Proyecto</th>
                 <th style={TH}>Comuna</th>
-                <th style={TH}>Fecha</th>
                 <th style={TH}>Estado</th>
                 <th style={{ ...TH, textAlign: 'center' }}>PDF</th>
               </tr>
@@ -397,13 +376,12 @@ export function PropuestasModule() {
             <tbody>
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ ...TD, textAlign: 'center', color: C.textMuted, padding: 32 }}>
+                  <td colSpan={7} style={{ ...TD, textAlign: 'center', color: C.textMuted, padding: 32 }}>
                     Sin resultados
                   </td>
                 </tr>
               )}
               {filtered.map((p, i) => {
-                const fecha   = effectiveFecha(p)
                 const status  = effectiveStatus(p)
                 const badge   = tipoBadge(p.tipo)
                 const firmado = status === 'firmado'
@@ -443,34 +421,6 @@ export function PropuestasModule() {
                     {/* Comuna */}
                     <td style={{ ...TD, fontSize: 12, color: C.textSec, whiteSpace: 'nowrap' }}>
                       {p.comuna ?? '—'}
-                    </td>
-
-                    {/* Fecha — editable */}
-                    <td style={{ ...TD, whiteSpace: 'nowrap' }}>
-                      {editingDate === p.id ? (
-                        <input
-                          type="date"
-                          defaultValue={fecha ?? ''}
-                          autoFocus
-                          onBlur={e => { patchOverride(p.id, { fecha: e.target.value || undefined }); setEditingDate(null) }}
-                          style={{
-                            fontSize: 12, border: `1px solid ${C.orange}`, borderRadius: 5,
-                            padding: '3px 7px', outline: 'none', width: 130,
-                          }}
-                        />
-                      ) : (
-                        <button
-                          onClick={() => setEditingDate(p.id)}
-                          title="Click para editar fecha"
-                          style={{
-                            background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                            fontSize: 12, color: fecha ? C.textPrimary : C.textMuted,
-                            borderBottom: `1px dashed ${fecha ? C.textMuted : C.border}`,
-                          }}
-                        >
-                          {fmtDate(fecha)}
-                        </button>
-                      )}
                     </td>
 
                     {/* Estado toggle */}
@@ -515,7 +465,7 @@ export function PropuestasModule() {
             {filtered.length > 0 && filtered.length !== propuestas.length && (
               <tfoot>
                 <tr>
-                  <td colSpan={8} style={{ ...TD, textAlign: 'right', fontSize: 11, color: C.textMuted, background: C.listBg }}>
+                  <td colSpan={7} style={{ ...TD, textAlign: 'right', fontSize: 11, color: C.textMuted, background: C.listBg }}>
                     Mostrando {filtered.length} de {propuestas.length}
                   </td>
                 </tr>
