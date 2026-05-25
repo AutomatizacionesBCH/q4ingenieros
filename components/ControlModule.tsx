@@ -608,23 +608,35 @@ export function ControlModule({ data }: { data: ControlData }) {
   const existingMesNames = data.months.map(m => m.mes)
   const allMesNames = [...existingMesNames, ...extraMonths]
 
-  // Resumen reactivo: prefiere allEdits (guardados por usuario) sobre datos del Excel
-  // También incluye meses extra agregados por el usuario
+  // Resumen reactivo: si el usuario editó los items, se calcula desde ellos.
+  // Si no hay edits, se usa el total del Excel (resumenFacturado/resumenIngresoCaja).
+  // Así la tabla de arriba siempre refleja lo que hay en los cuadros de abajo.
   const summaryFromMonths = [
     ...data.months.map(m => {
       const e = allEdits[m.mes] ?? {}
+      // Si hay items editados, calcular suma; si no, usar valor del Excel
+      const editedFac = e.facturadoItems
+        ? e.facturadoItems.reduce((s, it) => s + (it.amount ?? 0), 0)
+        : null
+      const editedIng = e.ingresoItems
+        ? e.ingresoItems.reduce((s, it) => s + (it.amount ?? 0), 0)
+        : null
       return {
         mes:      m.mes,
-        facturado: e.resumenFacturado   != null ? e.resumenFacturado   : m.resumenFacturado,
-        ingreso:   e.resumenIngresoCaja != null ? e.resumenIngresoCaja : m.resumenIngresoCaja,
+        facturado: editedFac ?? m.resumenFacturado,
+        ingreso:   editedIng ?? m.resumenIngresoCaja,
       }
     }),
     ...extraMonths.map(mes => {
       const e = allEdits[mes] ?? {}
       return {
         mes,
-        facturado: e.resumenFacturado   ?? null,
-        ingreso:   e.resumenIngresoCaja ?? null,
+        facturado: e.facturadoItems
+          ? e.facturadoItems.reduce((s, it) => s + (it.amount ?? 0), 0) || null
+          : null,
+        ingreso: e.ingresoItems
+          ? e.ingresoItems.reduce((s, it) => s + (it.amount ?? 0), 0) || null
+          : null,
       }
     }),
   ]
