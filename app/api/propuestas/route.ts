@@ -3,40 +3,14 @@ import path from 'path'
 import fs from 'fs'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>
-import { getPropuestaOverrides, setPropuestaOverride } from '@/lib/db'
+import { getPropuestaOverrides } from '@/lib/db'
+import type { PropuestaItem } from '@/lib/propuesta-utils'
+import { tipoLabel } from '@/lib/propuesta-utils'
+
+export { tipoLabel }
+export type { PropuestaItem }
 
 export const dynamic = 'force-dynamic'
-
-// ── Types ──────────────────────────────────────────────────────────────────────
-export interface PropuestaItem {
-  id:          string          // filename sin .pdf
-  proyectoId:  number | null   // 212, 215 …
-  version:     string          // "01"
-  tipo:        string          // "PAV" | "VER" | "ROT" | "CCL" | "IMIV" | "PRY" | "ARQ" | "EST"
-  locCode:     string          // "MCHL", "ETBO" …
-  contraparte: string          // "Francisca Soto Fuentes"
-  proyecto:    string          // "Elaboración Proyecto de ingeniería…"
-  especialista:string          // puede coincidir con contraparte
-  comuna:      string | null
-  codigo:      string          // "P-212"
-  fecha:       string | null   // YYYY-MM-DD
-  url:         string
-}
-
-// ── Type code → label ──────────────────────────────────────────────────────────
-const TIPO_LABEL: Record<string, string> = {
-  PAV:  'Pavimentación',
-  VER:  'Veredas',
-  ROT:  'Rotura y Reposición',
-  CCL:  'Ciclovía',
-  IMIV: 'IMIV',
-  PRY:  'Proyecto',
-  ARQ:  'Arquitectura',
-  EST:  'Estructural',
-}
-export function tipoLabel(code: string) {
-  return TIPO_LABEL[code.toUpperCase()] ?? code
-}
 
 // ── Date helpers ───────────────────────────────────────────────────────────────
 const MESES: Record<string, string> = {

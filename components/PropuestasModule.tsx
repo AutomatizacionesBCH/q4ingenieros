@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import type { PropuestaItem } from '@/app/api/propuestas/route'
-import { tipoLabel } from '@/app/api/propuestas/route'
+import type { PropuestaItem } from '@/lib/propuesta-utils'
+import { tipoLabel } from '@/lib/propuesta-utils'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
