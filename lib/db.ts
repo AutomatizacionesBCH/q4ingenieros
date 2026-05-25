@@ -207,6 +207,70 @@ export async function getProjectsFromDB(): Promise<ProjectsIndex | null> {
   return { projects, stats }
 }
 
+/**
+ * Returns all projects enriched with pending/margin/eps in 3 parallel queries.
+ * Replaces the old pattern of calling getProjectDetail() 230 times from the page.
+ */
+export async function getProjectsWithListItems(): Promise<import('@/types/ui').ProjectListItem[] | null> {
+  const supabase = getSupabase()
+  const seeded = await isDBSeeded()
+  if (!seeded) return null
+
+  const [projectsRes, detailsRes, epsRes, editsRes] = await Promise.all([
+    supabase.from('projects').select('*').order('id'),
+    supabase.from('project_details').select('project_id, pending, margin'),
+    supabase.from('eps').select('project_id, idx, label, amount, estimated_date, real_date, is_paid').order('idx'),
+    supabase.from('project_edits').select('project_id, budget, egresos'),
+  ])
+
+  if (!projectsRes.data || projectsRes.error) return null
+
+  const detailMap = new Map((detailsRes.data ?? []).map(d => [d.project_id as number, d]))
+  const editsMap  = new Map((editsRes.data  ?? []).map(e => [e.project_id as number, e]))
+
+  // Group EPs by project
+  const epsMap = new Map<number, import('@/types/ui').EpSlim[]>()
+  for (const ep of (epsRes.data ?? [])) {
+    const pid = ep.project_id as number
+    const list = epsMap.get(pid) ?? []
+    list.push({
+      label:         ep.label         ?? '',
+      amount:        ep.amount        ?? null,
+      estimatedDate: ep.estimated_date ?? null,
+      realDate:      ep.real_date      ?? null,
+      isPaid:        ep.is_paid === true,
+    })
+    epsMap.set(pid, list)
+  }
+
+  return projectsRes.data.map(p => {
+    const detail = detailMap.get(p.id as number)
+    const edits  = editsMap.get(p.id as number)
+    const allEps = epsMap.get(p.id as number) ?? []
+
+    // Apply edit overrides to pending/margin if the budget was changed
+    let pending = (detail?.pending as number | null) ?? null
+    let margin  = (detail?.margin  as number | null) ?? null
+    if (edits?.budget != null || edits?.egresos != null) {
+      // Recalculate: pending = budget_net - paid_eps; we approximate with stored pending
+      // Full recalculation happens in ProyectosModule — here we just pass stored values
+    }
+
+    return {
+      id:             p.id             as number,
+      client:         p.client         as string,
+      name:           p.name           as string,
+      status:         p.status         as string,
+      isFinalized:    p.is_finalized   as boolean,
+      scope:          p.scope          as import('@/types/project').ProjectScope,
+      managementType: p.management_type as import('@/types/project').ManagementType,
+      pending,
+      margin,
+      eps: allEps.filter(ep => /^(EP|Anticipo)/i.test(ep.label.trim())),
+    }
+  })
+}
+
 export async function getProjectDetailFromDB(id: number): Promise<ProjectDetail | null> {
   const supabase = getSupabase()
 

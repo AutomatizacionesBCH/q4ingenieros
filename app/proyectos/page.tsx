@@ -1,35 +1,23 @@
 /**
  * app/proyectos/page.tsx — Project list (Server Component)
  *
- * Loads all project data server-side using the module-level cache,
- * then passes serializable data to ProyectosModule (Client Component).
+ * Loads all project data from Supabase in 3 parallel queries (projects +
+ * project_details + eps). No Excel reads at runtime.
  */
-import { getProjectsIndex, getProjectDetail } from '@/lib/excel-parser'
+import { getProjectsWithListItems } from '@/lib/db'
 import { ProyectosModule } from '@/components/ProyectosModule'
-import type { ProjectListItem } from '@/types/ui'
 
-export default function ProyectosPage() {
-  const { projects } = getProjectsIndex()
+export default async function ProyectosPage() {
+  const listItems = await getProjectsWithListItems()
 
-  const listItems: ProjectListItem[] = projects.map(p => {
-    const detail = getProjectDetail(p.id) // null for project 174
-
-    const eps =
-      detail?.eps.filter(ep => /^(EP|Anticipo)/i.test(ep.label.trim())) ?? []
-
-    return {
-      id: p.id,
-      client: p.client,
-      name: p.name,
-      status: p.status,
-      isFinalized: p.isFinalized,
-      scope: p.scope,
-      managementType: p.managementType,
-      pending: detail?.pending ?? null,
-      margin: detail?.margin ?? null,
-      eps,
-    }
-  })
+  if (!listItems) {
+    return (
+      <div style={{ padding: 40, color: '#64748B', fontFamily: 'sans-serif' }}>
+        <h2>Base de datos no inicializada</h2>
+        <p>Llama a <code>/api/admin/seed</code> para importar los datos del Excel a Supabase.</p>
+      </div>
+    )
+  }
 
   return <ProyectosModule projects={listItems} />
 }

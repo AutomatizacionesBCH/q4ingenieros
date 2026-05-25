@@ -7,7 +7,7 @@
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { getProjectDetail } from '@/lib/excel-parser'
+import { getProjectDetailFromDB } from '@/lib/db'
 import { formatCLP, formatDate, getStatusStyle } from '@/lib/format'
 import { BackButton } from '@/components/BackButton'
 import type { ProjectDetail, EP, Expense } from '@/types/project'
@@ -247,31 +247,9 @@ export default async function ProyectoDetailPage({
   const id = parseInt(n, 10)
   if (isNaN(id) || id <= 0) notFound()
 
-  const project: ProjectDetail | null = getProjectDetail(id)
+  const project: ProjectDetail | null = await getProjectDetailFromDB(id)
 
-  // Project exists in Resumen but has no detail sheet (e.g. #174)
-  if (!project) {
-    const { getProjectsIndex } = await import('@/lib/excel-parser')
-    const { projects } = getProjectsIndex()
-    const summary = projects.find(p => p.id === id)
-    if (!summary) notFound()
-
-    return (
-      <div className="min-h-screen p-6" style={{ background: C.canvas }}>
-        <header
-          className="flex items-center gap-3 px-0 py-0 mb-6"
-        >
-          <BackButton />
-        </header>
-        <p className="text-sm" style={{ color: C.muted }}>
-          Proyecto #{id} — {summary.client}: sin hoja de detalle en el archivo Excel.
-        </p>
-        <p className="text-xs mt-1" style={{ color: C.muted }}>
-          Estado: {summary.status} · {summary.scope ?? 'Sin ámbito'}
-        </p>
-      </div>
-    )
-  }
+  if (!project) notFound()
 
   const { color: statusColor, label: statusLabel } = getStatusStyle(project.status)
   const hasPending  = project.pending !== null && project.pending > 0

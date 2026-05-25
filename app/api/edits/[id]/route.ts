@@ -10,7 +10,7 @@ export async function GET(
   const { id } = await params
   const projectId = parseInt(id, 10)
   if (isNaN(projectId)) return NextResponse.json({}, { status: 400 })
-  return NextResponse.json(getEdits(projectId))
+  return NextResponse.json(await getEdits(projectId))
 }
 
 export async function POST(
@@ -21,6 +21,6 @@ export async function POST(
   const projectId = parseInt(id, 10)
   if (isNaN(projectId)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
   const body = await req.json()
-  saveEdits(projectId, body)
+  await saveEdits(projectId, body)
   return NextResponse.json({ ok: true })
 }
