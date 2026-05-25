@@ -3,9 +3,14 @@
  *
  * Loads all project data from Supabase in 3 parallel queries (projects +
  * project_details + eps). No Excel reads at runtime.
+ *
+ * force-dynamic: prevents Next.js from pre-rendering at build time
+ * (Supabase env vars are not available during docker build).
  */
 import { getProjectsWithListItems } from '@/lib/db'
 import { ProyectosModule } from '@/components/ProyectosModule'
+
+export const dynamic = 'force-dynamic'
 
 export default async function ProyectosPage() {
   const listItems = await getProjectsWithListItems()

@@ -8,6 +8,8 @@ import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { getProjectDetailFromDB } from '@/lib/db'
+
+export const dynamic = 'force-dynamic'
 import { formatCLP, formatDate, getStatusStyle } from '@/lib/format'
 import { BackButton } from '@/components/BackButton'
 import type { ProjectDetail, EP, Expense } from '@/types/project'
