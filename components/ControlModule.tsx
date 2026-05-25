@@ -295,8 +295,6 @@ function TotalLine({ label, value, color, big, note }: { label: string; value: n
 interface Draft {
   facItems:  EditItem[]
   ingItems:  IngresoEditItem[]
-  resFac:    string
-  resIng:    string
 }
 
 function toFacEdit(items: { project: string; amount: number | null }[]): EditItem[] {
@@ -323,8 +321,6 @@ function MonthCard({ mes, month, edits, onSave, onDelete }: {
     setDraft({
       facItems: toFacEdit(fac),
       ingItems: toIngEdit(ing),
-      resFac:   String(edits.resumenFacturado   ?? month?.resumenFacturado   ?? ''),
-      resIng:   String(edits.resumenIngresoCaja ?? month?.resumenIngresoCaja ?? ''),
     })
     setEditing(true)
   }
@@ -337,13 +333,16 @@ function MonthCard({ mes, month, edits, onSave, onDelete }: {
 
   const save = () => {
     if (!draft) return
+    const filteredFac = draft.facItems.filter(it => it.project || it.amount)
+    const filteredIng = draft.ingItems.filter(it => it.project || it.amount)
+    // Resumen se calcula automáticamente desde los items
+    const autoFac = filteredFac.reduce((s, it) => s + (parseNum(it.amount) ?? 0), 0)
+    const autoIng = filteredIng.reduce((s, it) => s + (parseNum(it.amount) ?? 0), 0)
     onSave({
-      facturadoItems: draft.facItems.filter(it => it.project || it.amount)
-        .map(it => ({ project: it.project, amount: parseNum(it.amount) })),
-      ingresoItems: draft.ingItems.filter(it => it.project || it.amount)
-        .map(it => ({ project: it.project, amount: parseNum(it.amount), tipo: it.tipo })),
-      resumenFacturado:    parseNum(draft.resFac),
-      resumenIngresoCaja:  parseNum(draft.resIng),
+      facturadoItems: filteredFac.map(it => ({ project: it.project, amount: parseNum(it.amount) })),
+      ingresoItems:   filteredIng.map(it => ({ project: it.project, amount: parseNum(it.amount), tipo: it.tipo })),
+      resumenFacturado:   autoFac,
+      resumenIngresoCaja: autoIng,
     })
     setDraft(null)
     setEditing(false)
@@ -371,9 +370,6 @@ function MonthCard({ mes, month, edits, onSave, onDelete }: {
   const computedIngTotal = ingItems.reduce((s, it) => s + (parseNum(it.amount) ?? 0), 0)
   const computedPrivTotal = ingItems.filter(it => it.tipo === 'Privado').reduce((s, it) => s + (parseNum(it.amount) ?? 0), 0)
   const computedPubTotal  = ingItems.filter(it => it.tipo === 'Público').reduce((s, it) => s + (parseNum(it.amount) ?? 0), 0)
-
-  const resFac = editing && draft ? parseNum(draft.resFac) : (edits.resumenFacturado   ?? month?.resumenFacturado)
-  const resIng = editing && draft ? parseNum(draft.resIng) : (edits.resumenIngresoCaja ?? month?.resumenIngresoCaja)
 
   const hasEdits = Object.keys(edits).length > 0
 
@@ -494,44 +490,32 @@ function MonthCard({ mes, month, edits, onSave, onDelete }: {
           <TotalLine label="Total" value={computedIngTotal || null} color={C.green} big note={editing ? 'auto' : undefined} />
         </Box>
 
-        {/* ── Box 3: Resumen ── */}
+        {/* ── Box 3: Resumen — siempre calculado desde los items ── */}
         <Box accent={C.orange} title="Resumen" editing={editing}>
-          {editing && draft ? (
-            <>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 9, color: C.textMt, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Total Facturado</label>
-                <input value={draft.resFac} onChange={e => setDraft(d => d ? { ...d, resFac: e.target.value } : d)}
-                  placeholder="0" style={{ border: `1px solid ${C.border}`, borderRadius: 5, padding: '5px 8px', fontSize: 12, fontVariantNumeric: 'tabular-nums', background: C.editBg, color: C.text, outline: 'none', width: '100%', boxSizing: 'border-box' }} />
+          <div>
+            <div style={{ fontSize: 9, color: C.textMt, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Total Facturado</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: C.text, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
+              {fmtCLP(computedFacTotal || null)}
+            </div>
+            {editing && <div style={{ fontSize: 9, color: C.textMt, marginTop: 2 }}>↑ suma automática</div>}
+          </div>
+          <Divider />
+          <div>
+            <div style={{ fontSize: 9, color: C.textMt, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Total Ingreso Caja</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: C.green, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
+              {fmtCLP(computedIngTotal || null)}
+            </div>
+            {editing && <div style={{ fontSize: 9, color: C.textMt, marginTop: 2 }}>↑ suma automática</div>}
+          </div>
+          {computedFacTotal > 0 && computedIngTotal > 0 && (
+            <div style={{ marginTop: 4 }}>
+              <div style={{ height: 4, background: C.border, borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.min(100, (computedIngTotal / computedFacTotal) * 100)}%`, background: C.green, borderRadius: 2 }} />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 9, color: C.textMt, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Total Ingreso Caja</label>
-                <input value={draft.resIng} onChange={e => setDraft(d => d ? { ...d, resIng: e.target.value } : d)}
-                  placeholder="0" style={{ border: `1px solid ${C.border}`, borderRadius: 5, padding: '5px 8px', fontSize: 12, fontVariantNumeric: 'tabular-nums', background: C.editBg, color: C.text, outline: 'none', width: '100%', boxSizing: 'border-box' }} />
+              <div style={{ fontSize: 9, color: C.textMt, marginTop: 3 }}>
+                {((computedIngTotal / computedFacTotal) * 100).toFixed(1)}% cobrado
               </div>
-            </>
-          ) : (
-            <>
-              <div>
-                <div style={{ fontSize: 9, color: C.textMt, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Total Facturado</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: C.text, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{fmtCLP(resFac)}</div>
-              </div>
-              <Divider />
-              <div>
-                <div style={{ fontSize: 9, color: C.textMt, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Total Ingreso Caja</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: C.green, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{fmtCLP(resIng)}</div>
-              </div>
-              {/* Efficiency mini-bar */}
-              {resFac && resIng && resFac > 0 && (
-                <div style={{ marginTop: 4 }}>
-                  <div style={{ height: 4, background: C.border, borderRadius: 2, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${Math.min(100, (resIng / resFac) * 100)}%`, background: C.green, borderRadius: 2 }} />
-                  </div>
-                  <div style={{ fontSize: 9, color: C.textMt, marginTop: 3 }}>
-                    {((resIng / resFac) * 100).toFixed(1)}% cobrado
-                  </div>
-                </div>
-              )}
-            </>
+            </div>
           )}
         </Box>
 
@@ -624,12 +608,26 @@ export function ControlModule({ data }: { data: ControlData }) {
   const existingMesNames = data.months.map(m => m.mes)
   const allMesNames = [...existingMesNames, ...extraMonths]
 
-  // Derivar resumen desde CURSADO-INGRESADO (más fiable que hoja RESUMEN para meses en curso)
-  const summaryFromMonths = data.months.map(m => ({
-    mes: m.mes,
-    facturado: m.resumenFacturado,
-    ingreso:   m.resumenIngresoCaja,
-  }))
+  // Resumen reactivo: prefiere allEdits (guardados por usuario) sobre datos del Excel
+  // También incluye meses extra agregados por el usuario
+  const summaryFromMonths = [
+    ...data.months.map(m => {
+      const e = allEdits[m.mes] ?? {}
+      return {
+        mes:      m.mes,
+        facturado: e.resumenFacturado   != null ? e.resumenFacturado   : m.resumenFacturado,
+        ingreso:   e.resumenIngresoCaja != null ? e.resumenIngresoCaja : m.resumenIngresoCaja,
+      }
+    }),
+    ...extraMonths.map(mes => {
+      const e = allEdits[mes] ?? {}
+      return {
+        mes,
+        facturado: e.resumenFacturado   ?? null,
+        ingreso:   e.resumenIngresoCaja ?? null,
+      }
+    }),
+  ]
   const totalsFromMonths = {
     facturado: summaryFromMonths.some(m => m.facturado !== null)
       ? summaryFromMonths.reduce((s, m) => s + (m.facturado ?? 0), 0) : null,
