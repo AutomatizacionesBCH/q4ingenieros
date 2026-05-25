@@ -10,6 +10,11 @@ process.env['PDFJS_DISABLE_WORKER'] = '1'
 
 export const dynamic = 'force-dynamic'
 
+// ── Caché a nivel de módulo (persiste en producción — igual que workbook) ──────
+interface DocsCache { docs: DocItem[]; ts: number }
+let _cache: DocsCache | null = null
+const CACHE_TTL = 10 * 60 * 1000 // 10 minutos
+
 export interface DocItem {
   id:          string
   filename:    string
@@ -139,13 +144,44 @@ function readFolder(docsRoot: string, folder: 'boletas' | 'facturas'): DocItem[]
   }
 }
 
+// ── Extracción de fechas PDF en background (fire & forget) ───────────────────
+// Procesa en lotes paralelos de 5 para no saturar el sistema.
+// Actualiza Supabase y el caché en memoria sin bloquear la respuesta.
+async function extractDatesBackground(
+  missing: DocItem[],
+  docsRoot: string,
+): Promise<void> {
+  const BATCH = 5
+  for (let i = 0; i < missing.length; i += BATCH) {
+    const batch = missing.slice(i, i + BATCH)
+    await Promise.allSettled(batch.map(async doc => {
+      const filePath  = path.join(docsRoot, doc.folder, doc.filename)
+      const extracted = await extractDateFromPDF(filePath)
+      if (extracted) {
+        await setDocOverride(doc.id, { fecha: extracted })
+        // Actualizar caché en memoria para que la próxima petición ya tenga la fecha
+        if (_cache) {
+          _cache.docs = _cache.docs.map(d =>
+            d.id === doc.id ? { ...d, fecha: extracted } : d
+          )
+        }
+      }
+    }))
+  }
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const refresh = searchParams.get('refresh') === '1'
 
   const docsRoot = path.join(process.cwd(), 'public', 'docs')
 
-  // ── 1. List files ─────────────────────────────────────────────────────────────
+  // ── 1. Servir desde caché si está vigente ─────────────────────────────────────
+  if (_cache && !refresh && Date.now() - _cache.ts < CACHE_TTL) {
+    return NextResponse.json({ docs: _cache.docs })
+  }
+
+  // ── 2. Listar archivos ────────────────────────────────────────────────────────
   const boletas  = readFolder(docsRoot, 'boletas')
   const facturas = readFolder(docsRoot, 'facturas')
 
@@ -154,34 +190,32 @@ export async function GET(req: Request) {
     ...boletas.sort((a, b)  => (b.numero ?? 0) - (a.numero ?? 0)),
   ]
 
-  // ── 2. Supabase overrides + auto-extract dates (isolated) ─────────────────────
+  // ── 3. Overrides de Supabase (una sola query rápida) ─────────────────────────
   let overrides: Record<string, { fecha?: string; status?: string }> = {}
   try {
     overrides = await getAllDocOverrides()
-
-    for (const doc of all) {
-      // Skip only if Supabase already has an extracted/manual date AND not forcing refresh.
-      // Do NOT skip based on doc.fecha (filename-derived) — PDF date always takes precedence
-      // because filenames may only have the month (e.g. "Marzo") while the PDF has the full date.
-      if (!refresh && overrides[doc.id]?.fecha) continue
-
-      // Extract from PDF (first visible date top-to-bottom)
-      const filePath  = path.join(docsRoot, doc.folder, doc.filename)
-      const extracted = await extractDateFromPDF(filePath)
-      if (extracted && extracted !== overrides[doc.id]?.fecha) {
-        await setDocOverride(doc.id, { fecha: extracted })
-        overrides[doc.id] = { ...overrides[doc.id], fecha: extracted }
-      }
-    }
   } catch {
-    // Supabase unavailable — still return docs with filename-derived dates
+    // Supabase no disponible — usamos fechas del nombre de archivo
   }
 
-  // ── 3. Merge best available fecha ─────────────────────────────────────────────
+  // ── 4. Merge rápido y guardar en caché ───────────────────────────────────────
+  // Para docs sin fecha en Supabase, usamos fecha del nombre de archivo de momento.
+  // El background las irá actualizando con la fecha exacta del PDF.
   const merged = all.map(doc => ({
     ...doc,
     fecha: overrides[doc.id]?.fecha ?? doc.fecha,
   }))
 
-  return NextResponse.json({ docs: merged, docsRoot, cwd: process.cwd() })
+  _cache = { docs: merged, ts: Date.now() }
+
+  // ── 5. Extraer fechas PDF en background (no bloquea la respuesta) ─────────────
+  const missing = refresh
+    ? all
+    : all.filter(doc => !overrides[doc.id]?.fecha)
+
+  if (missing.length > 0) {
+    extractDatesBackground(missing, docsRoot).catch(console.error)
+  }
+
+  return NextResponse.json({ docs: merged })
 }
