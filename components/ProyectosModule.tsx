@@ -368,6 +368,13 @@ function EditableKpi({
   onInputChange: (v: string) => void
   onCommit: () => void; onCancel: () => void; onReset: () => void
 }) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Fix 2: select all text when edit mode activates so user can type to replace
+  useEffect(() => {
+    if (isEditing) inputRef.current?.select()
+  }, [isEditing])
+
   return (
     <div
       onClick={() => { if (!isEditing) onStartEdit(value) }}
@@ -394,6 +401,7 @@ function EditableKpi({
       </div>
       {isEditing ? (
         <input
+          ref={inputRef}
           autoFocus
           value={inputVal}
           onChange={e => onInputChange(e.target.value)}
@@ -620,20 +628,28 @@ function DetailPanel({
   currentStatus: 'active' | 'finalized'
   onStatusChange: (s: 'active' | 'finalized') => void
 }) {
-  // Only sum leaf items — section/subtotal rows are excluded to avoid double-counting
-  const totalEgresosCalc = detail.expenses
-    .filter(e => !e.isSection)
-    .reduce((s, e) => s + (e.amountNet ?? 0), 0)
-
   const [edits,    setEdits]    = useState<ProjEdits>({})
   const [active,   setActive]   = useState<ActiveEdit>(null)
   const [inputVal, setInputVal] = useState('')
 
+  // Fix 1: stale-flag + merge prevents async load from clobbering user edits
   useEffect(() => {
+    let stale = false
     setActive(null)
     setEdits({})
-    loadProjEdits(detail.id).then(setEdits)
+    loadProjEdits(detail.id).then(loaded => {
+      if (!stale) setEdits(prev => ({ ...loaded, ...prev }))
+    })
+    return () => { stale = true }
   }, [detail.id])
+
+  // Fix 3: sum uses edited amountNet when present (so editing expense rows updates the KPI)
+  const totalEgresosCalc = detail.expenses
+    .filter(e => !e.isSection)
+    .reduce((s, e, i) => {
+      const ov = edits.expenses?.[i] ?? {}
+      return s + (ov.amountNet ?? e.amountNet ?? 0)
+    }, 0)
 
   function persist(next: ProjEdits) { setEdits(next); saveProjEdits(detail.id, next) }
   function startEdit(ae: NonNullable<ActiveEdit>, initVal: string) { setActive(ae); setInputVal(initVal) }
