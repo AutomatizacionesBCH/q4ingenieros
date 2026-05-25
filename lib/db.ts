@@ -25,8 +25,10 @@ function chunk<T>(arr: T[], size: number): T[][] {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface DocOverride {
-  status?: 'pagado' | 'pendiente'
-  fecha?:  string
+  status?:      'pagado' | 'pendiente'
+  fecha?:       string
+  descripcion?: string
+  referencia?:  string
 }
 
 export interface DbEdits {
@@ -46,15 +48,17 @@ export async function getAllDocOverrides(): Promise<Record<string, DocOverride>>
   const supabase = getSupabase()
   const { data, error } = await supabase
     .from('document_overrides')
-    .select('doc_id, status, fecha')
+    .select('doc_id, status, fecha, descripcion, referencia')
 
   if (error || !data) return {}
 
   const result: Record<string, DocOverride> = {}
   for (const row of data) {
     result[row.doc_id] = {
-      status: row.status as 'pagado' | 'pendiente',
-      fecha:  row.fecha ?? undefined,
+      status:      row.status      as 'pagado' | 'pendiente' | undefined,
+      fecha:       row.fecha       ?? undefined,
+      descripcion: row.descripcion ?? undefined,
+      referencia:  row.referencia  ?? undefined,
     }
   }
   return result
@@ -66,7 +70,7 @@ export async function setDocOverride(docId: string, override: DocOverride): Prom
   // Fetch existing to apply COALESCE (don't overwrite non-null fields with null)
   const { data: existing } = await supabase
     .from('document_overrides')
-    .select('status, fecha')
+    .select('status, fecha, descripcion, referencia')
     .eq('doc_id', docId)
     .maybeSingle()
 
@@ -74,10 +78,12 @@ export async function setDocOverride(docId: string, override: DocOverride): Prom
     .from('document_overrides')
     .upsert(
       {
-        doc_id:     docId,
-        status:     override.status ?? existing?.status ?? 'pendiente',
-        fecha:      override.fecha  ?? existing?.fecha  ?? null,
-        updated_at: new Date().toISOString(),
+        doc_id:      docId,
+        status:      override.status      ?? existing?.status      ?? 'pendiente',
+        fecha:       override.fecha       ?? existing?.fecha       ?? null,
+        descripcion: override.descripcion ?? existing?.descripcion ?? null,
+        referencia:  override.referencia  ?? existing?.referencia  ?? null,
+        updated_at:  new Date().toISOString(),
       },
       { onConflict: 'doc_id' },
     )

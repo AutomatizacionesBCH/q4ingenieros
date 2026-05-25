@@ -27,7 +27,23 @@ const C = {
   editBorder:   '#FCD34D',
 } as const
 
-// ─── Tipo badges (PCE specialty types) ───────────────────────────────────────
+// ─── Grouped row type ─────────────────────────────────────────────────────────
+interface PropuestaGroup {
+  key:          number | string
+  pce?:         PropuestaItem
+  oc?:          PropuestaItem
+  primary:      PropuestaItem   // PCE if exists, else OC — used as save target
+  codigo:       string
+  tipo?:        string
+  contraparte:  string
+  proyecto:     string
+  especialista: string
+  comuna:       string | null
+}
+
+type EditableField = 'contraparte' | 'proyecto' | 'especialista' | 'comuna'
+
+// ─── Tipo badge colors ────────────────────────────────────────────────────────
 function tipoBadge(tipo: string | undefined) {
   if (!tipo) return null
   const colors: Record<string, { bg: string; color: string; border: string }> = {
@@ -43,19 +59,18 @@ function tipoBadge(tipo: string | undefined) {
   return colors[tipo.toUpperCase()] ?? { bg: C.listBg, color: C.textSec, border: C.border }
 }
 
-type EditableField = 'contraparte' | 'proyecto' | 'especialista' | 'comuna'
-
 // ─── CSV export ───────────────────────────────────────────────────────────────
-function exportCSV(rows: PropuestaItem[]) {
-  const header = ['Código','Doc','Tipo','Contraparte','Proyecto','Especialista','Comuna']
-  const data   = rows.map(p => [
-    p.codigo,
-    p.docType,
-    p.docType === 'PCE' ? tipoLabel(p.tipo ?? '') : 'Orden de Compra',
-    `"${(p.contraparte ?? '').replace(/"/g, '""')}"`,
-    `"${(p.proyecto    ?? '').replace(/"/g, '""')}"`,
-    `"${(p.especialista ?? '').replace(/"/g, '""')}"`,
-    p.comuna ?? '',
+function exportCSV(groups: PropuestaGroup[]) {
+  const header = ['Código','Tipo','Contraparte','Proyecto','Especialista','Comuna','PCE','OC']
+  const data   = groups.map(g => [
+    g.codigo,
+    g.tipo ? tipoLabel(g.tipo) : '—',
+    `"${(g.contraparte ?? '').replace(/"/g, '""')}"`,
+    `"${(g.proyecto    ?? '').replace(/"/g, '""')}"`,
+    `"${(g.especialista ?? '').replace(/"/g, '""')}"`,
+    g.comuna ?? '',
+    g.pce ? 'Sí' : 'No',
+    g.oc  ? 'Sí' : 'No',
   ])
   const csv  = [header, ...data].map(r => r.join(',')).join('\n')
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -66,7 +81,7 @@ function exportCSV(rows: PropuestaItem[]) {
   a.click(); URL.revokeObjectURL(url)
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Table styles ─────────────────────────────────────────────────────────────
 const TD: React.CSSProperties = {
   padding: '10px 14px', fontSize: 13, color: C.textPrimary,
   borderTop: `1px solid ${C.border}`, verticalAlign: 'middle',
@@ -77,27 +92,19 @@ const TH: React.CSSProperties = {
 }
 
 // ─── Inline editable cell ─────────────────────────────────────────────────────
-interface EditableCellProps {
+function EditableCell({
+  value, placeholder, onSave, style,
+}: {
   value:       string
   placeholder: string
   onSave:      (v: string) => void
   style?:      React.CSSProperties
-  inputStyle?: React.CSSProperties
-}
-
-function EditableCell({ value, placeholder, onSave, style, inputStyle }: EditableCellProps) {
+}) {
   const [editing, setEditing] = useState(false)
   const [draft,   setDraft]   = useState(value)
   const inputRef              = useRef<HTMLInputElement>(null)
 
-  function startEdit() {
-    setDraft(value)
-    setEditing(true)
-  }
-
-  useEffect(() => {
-    if (editing) inputRef.current?.select()
-  }, [editing])
+  useEffect(() => { if (editing) { setDraft(value); inputRef.current?.select() } }, [editing, value])
 
   function commit() {
     setEditing(false)
@@ -107,7 +114,7 @@ function EditableCell({ value, placeholder, onSave, style, inputStyle }: Editabl
 
   function handleKey(e: React.KeyboardEvent) {
     if (e.key === 'Enter')  { e.preventDefault(); commit() }
-    if (e.key === 'Escape') { setEditing(false); setDraft(value) }
+    if (e.key === 'Escape') { setEditing(false) }
   }
 
   if (editing) {
@@ -122,10 +129,8 @@ function EditableCell({ value, placeholder, onSave, style, inputStyle }: Editabl
           width: '100%', padding: '5px 8px',
           border: `1.5px solid ${C.editBorder}`,
           borderRadius: 5, fontSize: 13,
-          background: C.editBg,
-          color: C.textPrimary, outline: 'none',
-          boxSizing: 'border-box',
-          ...inputStyle,
+          background: C.editBg, color: C.textPrimary,
+          outline: 'none', boxSizing: 'border-box',
         }}
       />
     )
@@ -133,18 +138,13 @@ function EditableCell({ value, placeholder, onSave, style, inputStyle }: Editabl
 
   return (
     <span
-      onClick={startEdit}
+      onClick={() => setEditing(true)}
       title="Clic para editar"
       style={{
-        cursor: 'text',
-        display: 'block',
-        minHeight: 22,
-        borderRadius: 4,
-        padding: '2px 4px',
-        margin: '-2px -4px',
+        cursor: 'text', display: 'block', minHeight: 22,
+        borderRadius: 4, padding: '2px 4px', margin: '-2px -4px',
         color: value ? undefined : C.textMuted,
         fontStyle: value ? 'normal' : 'italic',
-        transition: 'background 0.1s',
         ...style,
       }}
       onMouseEnter={e => (e.currentTarget.style.background = 'rgba(229,80,30,0.05)')}
@@ -155,6 +155,29 @@ function EditableCell({ value, placeholder, onSave, style, inputStyle }: Editabl
   )
 }
 
+// ─── PDF button ───────────────────────────────────────────────────────────────
+function PdfBtn({ url, label, variant }: { url: string; label: string; variant: 'orange' | 'blue' }) {
+  const isBlue = variant === 'blue'
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 3,
+        padding: '4px 9px', borderRadius: 6,
+        border: `1px solid ${isBlue ? C.blueBorder : C.border}`,
+        background: isBlue ? C.blueBg : C.card,
+        fontSize: 11, fontWeight: 600,
+        color: isBlue ? C.blue : C.orange,
+        textDecoration: 'none', whiteSpace: 'nowrap',
+      }}
+    >
+      ↗ {label}
+    </a>
+  )
+}
+
 // ─── Module ───────────────────────────────────────────────────────────────────
 export function PropuestasModule() {
   const isMobile = useIsMobile()
@@ -162,12 +185,11 @@ export function PropuestasModule() {
   const [propuestas, setPropuestas] = useState<PropuestaItem[]>([])
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState<string | null>(null)
-  const [saving,     setSaving]     = useState<string | null>(null) // doc_id being saved
+  const [saving,     setSaving]     = useState<string | null>(null)
 
   // ── Filters ──────────────────────────────────────────────────────────────────
-  const [docTypeF, setDocTypeF] = useState<'todos' | 'PCE' | 'OC'>('todos')
-  const [tipoF,    setTipoF]    = useState('todos')
-  const [search,   setSearch]   = useState('')
+  const [tipoF,  setTipoF]  = useState('todos')
+  const [search, setSearch] = useState('')
 
   // ── Load ──────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -181,14 +203,18 @@ export function PropuestasModule() {
   }, [])
 
   // ── Save field ────────────────────────────────────────────────────────────────
-  async function saveField(id: string, field: EditableField, value: string) {
-    // Optimistic update
-    setPropuestas(prev => prev.map(p =>
-      p.id === id ? { ...p, [field]: value } : p
-    ))
-    setSaving(id)
+  async function saveField(group: PropuestaGroup, field: EditableField, value: string) {
+    const pid = group.primary.proyectoId
+
+    // Optimistic update — update all propuestas in this group
+    setPropuestas(prev => prev.map(p => {
+      const sameGroup = pid != null ? p.proyectoId === pid : p.id === group.primary.id
+      return sameGroup ? { ...p, [field]: value } : p
+    }))
+
+    setSaving(group.primary.id)
     try {
-      await fetch(`/api/propuestas/${encodeURIComponent(id)}`, {
+      await fetch(`/api/propuestas/${encodeURIComponent(group.primary.id)}`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ [field]: value }),
@@ -200,34 +226,60 @@ export function PropuestasModule() {
     }
   }
 
-  // ── Available tipos (PCE only) ────────────────────────────────────────────────
-  const tiposDisponibles = useMemo(() => {
-    const s = new Set(
-      propuestas
-        .filter(p => p.docType === 'PCE' && p.tipo)
-        .map(p => p.tipo as string)
-    )
-    return Array.from(s).sort()
+  // ── Group PCE + OC by proyectoId ──────────────────────────────────────────────
+  const groups = useMemo<PropuestaGroup[]>(() => {
+    const map = new Map<number | string, { pce?: PropuestaItem; oc?: PropuestaItem }>()
+
+    for (const p of propuestas) {
+      const key = p.proyectoId != null ? p.proyectoId : p.id
+      const existing = map.get(key) ?? {}
+      if (p.docType === 'PCE') existing.pce = p
+      else                     existing.oc  = p
+      map.set(key, existing)
+    }
+
+    return Array.from(map.values())
+      .map(({ pce, oc }) => {
+        const primary = pce ?? oc!
+        return {
+          key:         primary.proyectoId ?? primary.id,
+          pce,
+          oc,
+          primary,
+          codigo:      pce?.codigo ?? oc?.codigo ?? '',
+          tipo:        pce?.tipo,
+          contraparte: primary.contraparte,
+          proyecto:    primary.proyecto,
+          especialista: primary.especialista,
+          comuna:      primary.comuna,
+        }
+      })
+      .sort((a, b) => {
+        const aId = typeof a.key === 'number' ? a.key : 9999
+        const bId = typeof b.key === 'number' ? b.key : 9999
+        return aId - bId
+      })
   }, [propuestas])
 
-  // ── Filtered rows ─────────────────────────────────────────────────────────────
+  // ── Available tipos (from PCE docs) ───────────────────────────────────────────
+  const tiposDisponibles = useMemo(() => {
+    const s = new Set(groups.filter(g => g.tipo).map(g => g.tipo as string))
+    return Array.from(s).sort()
+  }, [groups])
+
+  // ── Filtered groups ───────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    return propuestas.filter(p => {
-      if (docTypeF !== 'todos' && p.docType !== docTypeF) return false
-      // tipo filter only applies to PCE
-      if (tipoF !== 'todos' && p.docType === 'PCE' && p.tipo !== tipoF) return false
+    return groups.filter(g => {
+      if (tipoF !== 'todos' && g.tipo !== tipoF) return false
       if (search) {
         const q   = search.toLowerCase()
-        const hay = [p.contraparte, p.proyecto, p.comuna ?? '', p.especialista, p.codigo, p.ocNumber ?? '']
-          .join(' ').toLowerCase()
+        const hay = [g.contraparte, g.proyecto, g.comuna ?? '', g.especialista, g.codigo,
+          g.oc?.ocNumber ?? ''].join(' ').toLowerCase()
         if (!hay.includes(q)) return false
       }
       return true
     })
-  }, [propuestas, docTypeF, tipoF, search])
-
-  const pceCount = useMemo(() => propuestas.filter(p => p.docType === 'PCE').length, [propuestas])
-  const ocCount  = useMemo(() => propuestas.filter(p => p.docType === 'OC').length,  [propuestas])
+  }, [groups, tipoF, search])
 
   // ── Render ────────────────────────────────────────────────────────────────────
   if (loading) {
@@ -237,7 +289,7 @@ export function PropuestasModule() {
     return <div style={{ padding: 40, color: '#DC2626', fontSize: 14 }}>Error: {error}</div>
   }
 
-  const hasActiveFilters = docTypeF !== 'todos' || tipoF !== 'todos' || !!search
+  const hasActiveFilters = tipoF !== 'todos' || !!search
 
   return (
     <div style={{ background: C.canvas, minHeight: '100vh', padding: isMobile ? '16px 12px' : '24px 28px' }}>
@@ -248,38 +300,18 @@ export function PropuestasModule() {
           <h1 style={{ fontSize: 20, fontWeight: 700, color: C.textPrimary, margin: 0, lineHeight: 1.2 }}>
             Propuestas de Cierre
           </h1>
-          <div style={{ display: 'flex', gap: 10, marginTop: 5, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, color: C.textSec }}>
-              {propuestas.length} documento{propuestas.length !== 1 ? 's' : ''}
-            </span>
-            {pceCount > 0 && (
-              <span style={{
-                fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4,
-                background: 'rgba(229,80,30,0.08)', color: C.orange, border: `1px solid rgba(229,80,30,0.2)`,
-              }}>
-                {pceCount} PCE
-              </span>
-            )}
-            {ocCount > 0 && (
-              <span style={{
-                fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4,
-                background: C.blueBg, color: C.blue, border: `1px solid ${C.blueBorder}`,
-              }}>
-                {ocCount} OC
-              </span>
-            )}
-          </div>
+          <p style={{ fontSize: 13, color: C.textSec, margin: '4px 0 0' }}>
+            {groups.length} proyecto{groups.length !== 1 ? 's' : ''} · {propuestas.filter(p => p.docType === 'PCE').length} PCE · {propuestas.filter(p => p.docType === 'OC').length} OC
+          </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {saving && (
-            <span style={{ fontSize: 11, color: C.textMuted, fontStyle: 'italic' }}>Guardando…</span>
-          )}
+          {saving && <span style={{ fontSize: 11, color: C.textMuted, fontStyle: 'italic' }}>Guardando…</span>}
           <button
             onClick={() => exportCSV(filtered)}
             style={{
               padding: '7px 14px', borderRadius: 7, border: `1px solid ${C.border}`,
               background: C.card, color: C.textSec, fontSize: 12, fontWeight: 600,
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+              cursor: 'pointer',
             }}
           >
             ↓ CSV
@@ -299,34 +331,7 @@ export function PropuestasModule() {
             width: isMobile ? '100%' : 240,
           }}
         />
-
-        {/* DocType filter */}
-        <div style={{ display: 'flex', gap: 4 }}>
-          {(['todos', 'PCE', 'OC'] as const).map(dt => {
-            const active = docTypeF === dt
-            const accentBg    = dt === 'OC' ? C.blueBg    : 'rgba(229,80,30,0.08)'
-            const accentColor = dt === 'OC' ? C.blue      : C.orange
-            const accentBord  = dt === 'OC' ? C.blueBorder : 'rgba(229,80,30,0.3)'
-            return (
-              <button
-                key={dt}
-                onClick={() => setDocTypeF(dt)}
-                style={{
-                  padding: '5px 11px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600,
-                  border: `1px solid ${active && dt !== 'todos' ? accentBord : C.border}`,
-                  background: active ? (dt === 'todos' ? C.card : accentBg) : C.card,
-                  color: active && dt !== 'todos' ? accentColor : C.textSec,
-                  transition: 'all 0.1s',
-                }}
-              >
-                {dt === 'todos' ? 'Todos' : dt}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Tipo filter (PCE only) */}
-        {tiposDisponibles.length > 0 && docTypeF !== 'OC' && (
+        {tiposDisponibles.length > 0 && (
           <select
             value={tipoF}
             onChange={e => setTipoF(e.target.value)}
@@ -343,10 +348,9 @@ export function PropuestasModule() {
             ))}
           </select>
         )}
-
         {hasActiveFilters && (
           <button
-            onClick={() => { setDocTypeF('todos'); setTipoF('todos'); setSearch('') }}
+            onClick={() => { setTipoF('todos'); setSearch('') }}
             style={{ fontSize: 12, color: C.orange, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
           >
             ✕ Limpiar
@@ -357,13 +361,9 @@ export function PropuestasModule() {
       {/* Table */}
       <div style={{ background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
         {isMobile ? (
-          <MobileList items={filtered} onSave={saveField} />
+          <MobileList groups={filtered} onSave={saveField} />
         ) : (
-          <DesktopTable
-            items={filtered}
-            total={propuestas.length}
-            onSave={saveField}
-          />
+          <DesktopTable groups={filtered} total={groups.length} onSave={saveField} />
         )}
       </div>
     </div>
@@ -372,11 +372,11 @@ export function PropuestasModule() {
 
 // ─── Desktop table ─────────────────────────────────────────────────────────────
 function DesktopTable({
-  items, total, onSave,
+  groups, total, onSave,
 }: {
-  items:  PropuestaItem[]
+  groups: PropuestaGroup[]
   total:  number
-  onSave: (id: string, field: EditableField, value: string) => void
+  onSave: (g: PropuestaGroup, field: EditableField, value: string) => void
 }) {
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -386,53 +386,37 @@ function DesktopTable({
           <th style={TH}>Tipo</th>
           <th style={{ ...TH, minWidth: 160 }}>Contraparte</th>
           <th style={{ ...TH, minWidth: 200 }}>Proyecto</th>
-          <th style={{ ...TH, minWidth: 130 }}>Especialista</th>
-          <th style={{ ...TH, minWidth: 110 }}>Comuna</th>
-          <th style={{ ...TH, textAlign: 'center' }}>PDF</th>
+          <th style={{ ...TH, minWidth: 120 }}>Especialista</th>
+          <th style={{ ...TH, minWidth: 100 }}>Comuna</th>
+          <th style={{ ...TH, textAlign: 'center', minWidth: 140 }}>Documentos</th>
         </tr>
       </thead>
       <tbody>
-        {items.length === 0 && (
+        {groups.length === 0 && (
           <tr>
             <td colSpan={7} style={{ ...TD, textAlign: 'center', color: C.textMuted, padding: 32 }}>
               Sin resultados
             </td>
           </tr>
         )}
-        {items.map((p, i) => {
-          const isOC      = p.docType === 'OC'
+        {groups.map((g, i) => {
+          const badge     = tipoBadge(g.tipo)
+          const tipoText  = g.tipo ? tipoLabel(g.tipo) : null
           const rowBg     = i % 2 === 0 ? C.card : C.listBg
-          const badge     = isOC ? null : tipoBadge(p.tipo)
-          const tipoText  = isOC ? 'Orden de Compra' : tipoLabel(p.tipo ?? '')
 
           return (
-            <tr key={p.id} style={{ background: rowBg }}>
-              {/* Código + doc type badge */}
+            <tr key={String(g.key)} style={{ background: rowBg }}>
+
+              {/* Código */}
               <td style={{ ...TD, whiteSpace: 'nowrap' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <span style={{
-                    fontFamily: 'monospace', fontSize: 12,
-                    color: isOC ? C.blue : C.textSec,
-                    fontWeight: isOC ? 700 : 400,
-                  }}>
-                    {p.codigo}
-                  </span>
-                  <span style={{
-                    fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
-                    alignSelf: 'flex-start',
-                    background: isOC ? C.blueBg       : 'rgba(229,80,30,0.08)',
-                    color:      isOC ? C.blue         : C.orange,
-                    border:    `1px solid ${isOC ? C.blueBorder : 'rgba(229,80,30,0.2)'}`,
-                    letterSpacing: '0.05em',
-                  }}>
-                    {p.docType}
-                  </span>
-                </div>
+                <span style={{ fontFamily: 'monospace', fontSize: 12, color: C.textSec }}>
+                  {g.codigo}
+                </span>
               </td>
 
               {/* Tipo */}
               <td style={{ ...TD, whiteSpace: 'nowrap' }}>
-                {badge ? (
+                {badge && tipoText ? (
                   <span style={{
                     display: 'inline-block', fontSize: 11, fontWeight: 700,
                     padding: '2px 8px', borderRadius: 4,
@@ -441,16 +425,16 @@ function DesktopTable({
                     {tipoText}
                   </span>
                 ) : (
-                  <span style={{ fontSize: 11, color: C.textMuted }}>{tipoText}</span>
+                  <span style={{ fontSize: 11, color: C.textMuted }}>—</span>
                 )}
               </td>
 
               {/* Contraparte — editable */}
               <td style={{ ...TD, maxWidth: 200 }}>
                 <EditableCell
-                  value={p.contraparte ?? ''}
+                  value={g.contraparte ?? ''}
                   placeholder="—"
-                  onSave={v => onSave(p.id, 'contraparte', v)}
+                  onSave={v => onSave(g, 'contraparte', v)}
                   style={{ fontWeight: 600, fontSize: 13 }}
                 />
               </td>
@@ -458,61 +442,49 @@ function DesktopTable({
               {/* Proyecto — editable */}
               <td style={{ ...TD, maxWidth: 280 }}>
                 <EditableCell
-                  value={p.proyecto ?? ''}
+                  value={g.proyecto ?? ''}
                   placeholder="—"
-                  onSave={v => onSave(p.id, 'proyecto', v)}
+                  onSave={v => onSave(g, 'proyecto', v)}
                   style={{ fontSize: 12, color: C.textSec, lineHeight: 1.4 }}
                 />
               </td>
 
               {/* Especialista — editable */}
-              <td style={{ ...TD, maxWidth: 180 }}>
+              <td style={{ ...TD, maxWidth: 160 }}>
                 <EditableCell
-                  value={p.especialista ?? ''}
+                  value={g.especialista ?? ''}
                   placeholder="—"
-                  onSave={v => onSave(p.id, 'especialista', v)}
+                  onSave={v => onSave(g, 'especialista', v)}
                   style={{ fontSize: 12, color: C.textSec }}
                 />
               </td>
 
               {/* Comuna — editable */}
-              <td style={{ ...TD, maxWidth: 130 }}>
+              <td style={{ ...TD, maxWidth: 120 }}>
                 <EditableCell
-                  value={p.comuna ?? ''}
+                  value={g.comuna ?? ''}
                   placeholder="—"
-                  onSave={v => onSave(p.id, 'comuna', v)}
+                  onSave={v => onSave(g, 'comuna', v)}
                   style={{ fontSize: 12, color: C.textSec }}
                 />
               </td>
 
-              {/* PDF */}
+              {/* Documentos: PCE + OC buttons */}
               <td style={{ ...TD, textAlign: 'center' }}>
-                <a
-                  href={p.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                    padding: '4px 10px', borderRadius: 6,
-                    border: `1px solid ${isOC ? C.blueBorder : C.border}`,
-                    background: isOC ? C.blueBg : C.card,
-                    fontSize: 11, fontWeight: 600,
-                    color: isOC ? C.blue : C.orange,
-                    textDecoration: 'none',
-                  }}
-                >
-                  ↗ Abrir
-                </a>
+                <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  {g.pce && <PdfBtn url={g.pce.url} label="PCE" variant="orange" />}
+                  {g.oc  && <PdfBtn url={g.oc.url}  label="OC"  variant="blue"   />}
+                </div>
               </td>
             </tr>
           )
         })}
       </tbody>
-      {items.length > 0 && items.length !== total && (
+      {groups.length > 0 && groups.length !== total && (
         <tfoot>
           <tr>
             <td colSpan={7} style={{ ...TD, textAlign: 'right', fontSize: 11, color: C.textMuted, background: C.listBg }}>
-              Mostrando {items.length} de {total}
+              Mostrando {groups.length} de {total}
             </td>
           </tr>
         </tfoot>
@@ -523,12 +495,12 @@ function DesktopTable({
 
 // ─── Mobile list ───────────────────────────────────────────────────────────────
 function MobileList({
-  items, onSave,
+  groups, onSave,
 }: {
-  items:  PropuestaItem[]
-  onSave: (id: string, field: EditableField, value: string) => void
+  groups: PropuestaGroup[]
+  onSave: (g: PropuestaGroup, field: EditableField, value: string) => void
 }) {
-  if (items.length === 0) {
+  if (groups.length === 0) {
     return (
       <div style={{ padding: 32, textAlign: 'center', color: C.textMuted, fontSize: 13 }}>
         Sin resultados
@@ -538,33 +510,19 @@ function MobileList({
 
   return (
     <div>
-      {items.map((p, i) => {
-        const isOC     = p.docType === 'OC'
-        const badge    = isOC ? null : tipoBadge(p.tipo)
-        const tipoText = isOC ? 'Orden de Compra' : tipoLabel(p.tipo ?? '')
+      {groups.map((g, i) => {
+        const badge    = tipoBadge(g.tipo)
+        const tipoText = g.tipo ? tipoLabel(g.tipo) : null
 
         return (
-          <div key={p.id} style={{ padding: '14px 16px', borderTop: i > 0 ? `1px solid ${C.border}` : 'none' }}>
-            {/* Top row: código badges + PDF link */}
+          <div key={String(g.key)} style={{ padding: '14px 16px', borderTop: i > 0 ? `1px solid ${C.border}` : 'none' }}>
+            {/* Top row: código + tipo + PDF buttons */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
-                <span style={{
-                  fontSize: 11, fontWeight: 700, fontFamily: 'monospace',
-                  color: isOC ? C.blue : C.textMuted,
-                }}>
-                  {p.codigo}
+                <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'monospace', color: C.textSec }}>
+                  {g.codigo}
                 </span>
-                {/* DocType chip */}
-                <span style={{
-                  fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
-                  background: isOC ? C.blueBg : 'rgba(229,80,30,0.08)',
-                  color:      isOC ? C.blue   : C.orange,
-                  border:    `1px solid ${isOC ? C.blueBorder : 'rgba(229,80,30,0.2)'}`,
-                }}>
-                  {p.docType}
-                </span>
-                {/* Tipo chip (PCE only) */}
-                {badge && (
+                {badge && tipoText && (
                   <span style={{
                     fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
                     background: badge.bg, color: badge.color, border: `1px solid ${badge.border}`,
@@ -573,49 +531,43 @@ function MobileList({
                   </span>
                 )}
               </div>
-              <a
-                href={p.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  fontSize: 11, color: isOC ? C.blue : C.orange,
-                  fontWeight: 600, textDecoration: 'none', flexShrink: 0,
-                }}
-              >
-                Ver PDF ↗
-              </a>
+              {/* PDF buttons */}
+              <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                {g.pce && <PdfBtn url={g.pce.url} label="PCE" variant="orange" />}
+                {g.oc  && <PdfBtn url={g.oc.url}  label="OC"  variant="blue"   />}
+              </div>
             </div>
 
             {/* Editable fields */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <EditableCell
-                value={p.contraparte ?? ''}
+                value={g.contraparte ?? ''}
                 placeholder="Contraparte…"
-                onSave={v => onSave(p.id, 'contraparte', v)}
+                onSave={v => onSave(g, 'contraparte', v)}
                 style={{ fontSize: 13, fontWeight: 600, color: C.textPrimary }}
               />
               <EditableCell
-                value={p.proyecto ?? ''}
+                value={g.proyecto ?? ''}
                 placeholder="Descripción del proyecto…"
-                onSave={v => onSave(p.id, 'proyecto', v)}
+                onSave={v => onSave(g, 'proyecto', v)}
                 style={{ fontSize: 12, color: C.textSec, lineHeight: 1.4 }}
               />
               <div style={{ display: 'flex', gap: 8 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 9, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 1 }}>Especialista</div>
                   <EditableCell
-                    value={p.especialista ?? ''}
+                    value={g.especialista ?? ''}
                     placeholder="—"
-                    onSave={v => onSave(p.id, 'especialista', v)}
+                    onSave={v => onSave(g, 'especialista', v)}
                     style={{ fontSize: 11, color: C.textSec }}
                   />
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 9, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 1 }}>Comuna</div>
                   <EditableCell
-                    value={p.comuna ?? ''}
+                    value={g.comuna ?? ''}
                     placeholder="—"
-                    onSave={v => onSave(p.id, 'comuna', v)}
+                    onSave={v => onSave(g, 'comuna', v)}
                     style={{ fontSize: 11, color: C.textSec }}
                   />
                 </div>
