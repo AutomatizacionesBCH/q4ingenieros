@@ -1065,13 +1065,65 @@ function DetailPanel({
         <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <tbody>
+              {/* Total Egresos — editable inline */}
+              <tr style={{ background: C.listBg }}>
+                <td style={{ ...TD, color: C.textSec, width: '60%' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    Total Egresos
+                    {edits.egresos != null && (
+                      <span
+                        onClick={() => resetField('egresos')}
+                        title="Restaurar valor calculado"
+                        style={{ cursor: 'pointer', color: C.orange, fontSize: 12, lineHeight: 1, opacity: 0.7 }}
+                      >↺</span>
+                    )}
+                  </span>
+                </td>
+                <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                  {active?.kind === 'kpi' && active.field === 'egresos' ? (
+                    <input
+                      autoFocus
+                      value={inputVal}
+                      onChange={e => setInputVal(e.target.value)}
+                      onBlur={commitEdit}
+                      onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setActive(null) }}
+                      style={{
+                        width: '100%', textAlign: 'right', boxSizing: 'border-box',
+                        fontSize: 13, fontWeight: 500, color: C.danger,
+                        border: `1.5px solid ${C.orange}`, borderRadius: 5,
+                        padding: '3px 6px', outline: 'none', background: '#FFFBF0',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    />
+                  ) : (
+                    <span
+                      onClick={() => startEdit(
+                        { kind: 'kpi', field: 'egresos' },
+                        egresos != null ? String(Math.round(egresos)) : ''
+                      )}
+                      title="Clic para editar"
+                      style={{
+                        cursor: 'text', color: C.danger, fontWeight: 500,
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        padding: '2px 4px', borderRadius: 4,
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(220,38,38,0.05)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      {fmtCLP(egresos)}
+                      <span style={{ fontSize: 9, color: C.textMuted, opacity: 0.45 }}>✎</span>
+                    </span>
+                  )}
+                </td>
+              </tr>
+
+              {/* Static rows */}
               {([
-                { label: 'Total Egresos',      value: fmtCLP(egresos), color: C.danger, bold: false },
                 { label: 'Neto Q4 Ingenieros', value: fmtCLP(neto),    color: neto == null ? C.textSec : neto >= 0 ? C.success : C.danger, bold: true },
                 { label: 'Margen de Utilidad', value: marginCalc != null ? `${(marginCalc * 100).toFixed(1)}%` : '—', color: (marginCalc ?? 0) >= 0 ? C.success : C.danger, bold: true },
                 { label: 'Costo-Venta',        value: costoVenta != null ? `${(costoVenta * 100).toFixed(1)}%` : '—', color: C.textSec, bold: false },
               ] as { label: string; value: string; color: string; bold: boolean }[]).map((row, i) => (
-                <tr key={i} style={{ borderTop: i > 0 ? `1px solid ${C.border}` : 'none', background: i % 2 === 0 ? C.listBg : C.card }}>
+                <tr key={i} style={{ borderTop: `1px solid ${C.border}`, background: i % 2 === 0 ? C.card : C.listBg }}>
                   <td style={{ ...TD, fontWeight: row.bold ? 600 : 400, color: C.textSec, width: '60%' }}>{row.label}</td>
                   <td style={{ ...TD, textAlign: 'right', fontWeight: row.bold ? 700 : 500, color: row.color, fontVariantNumeric: 'tabular-nums' }}>
                     {row.value}
