@@ -83,6 +83,53 @@ export async function setDocOverride(docId: string, override: DocOverride): Prom
     )
 }
 
+// ─── Propuesta de Cierre overrides ───────────────────────────────────────────
+
+export interface PropuestaOverride {
+  status?: 'pendiente' | 'firmado'
+  fecha?:  string
+}
+
+export async function getPropuestaOverrides(): Promise<Record<string, PropuestaOverride>> {
+  const supabase = getSupabase()
+  const { data, error } = await supabase
+    .from('propuesta_overrides')
+    .select('doc_id, status, fecha')
+
+  if (error || !data) return {}
+
+  const result: Record<string, PropuestaOverride> = {}
+  for (const row of data) {
+    result[row.doc_id] = {
+      status: row.status as 'pendiente' | 'firmado' | undefined,
+      fecha:  row.fecha  ?? undefined,
+    }
+  }
+  return result
+}
+
+export async function setPropuestaOverride(docId: string, override: PropuestaOverride): Promise<void> {
+  const supabase = getSupabase()
+
+  const { data: existing } = await supabase
+    .from('propuesta_overrides')
+    .select('status, fecha')
+    .eq('doc_id', docId)
+    .maybeSingle()
+
+  await supabase
+    .from('propuesta_overrides')
+    .upsert(
+      {
+        doc_id:     docId,
+        status:     override.status ?? existing?.status ?? 'pendiente',
+        fecha:      override.fecha  ?? existing?.fecha  ?? null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'doc_id' },
+    )
+}
+
 // ─── Manual project status overrides ─────────────────────────────────────────
 
 export async function getAllStatusOverrides(): Promise<Record<number, 'active' | 'finalized'>> {

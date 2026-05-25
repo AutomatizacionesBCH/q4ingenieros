@@ -23,6 +23,7 @@ const MODULES = [
   { href: '/control',           label: 'Control Mensual 2026',   short: 'Mensual',    icon: '◈' },
   { href: '/control-pendiente', label: 'Pendiente Histórico',    short: 'Pendiente',  icon: '◉' },
   { href: '/documentos',        label: 'Documentos Tributarios', short: 'Docs',       icon: '◧' },
+  { href: '/propuestas',        label: 'Propuestas de Cierre',   short: 'Cierres',    icon: '◎' },
 ]
 
 function useUF() {
