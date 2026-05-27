@@ -5,11 +5,13 @@ import fs from 'fs'
 const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>
 import { getPropuestaOverrides } from '@/lib/db'
 import type { PropuestaItem, DocType } from '@/lib/propuesta-utils'
+import { isDriveConfigured, listDrivePDFs, getDriveFileBuffer } from '@/lib/google-drive'
 
 export type { PropuestaItem, DocType }
 export const dynamic = 'force-dynamic'
 
-const PROPUESTAS_DIR = process.env.DOCS_PROPUESTAS_PATH ?? path.join(process.cwd(), 'public', 'docs', 'propuestas')
+const PROPUESTAS_DIR      = process.env.DOCS_PROPUESTAS_PATH ?? path.join(process.cwd(), 'public', 'docs', 'propuestas')
+const DRIVE_PROPUESTAS_ID = process.env.DRIVE_PROPUESTAS_FOLDER_ID
 
 // ── Date helpers ───────────────────────────────────────────────────────────────
 const MESES: Record<string, string> = {
@@ -45,8 +47,15 @@ function extractLine(lines: string[], prefix: string): string {
   return ''
 }
 
-// ── PCE parser ─────────────────────────────────────────────────────────────────
-async function parsePCE(filePath: string, filename: string): Promise<PropuestaItem> {
+// ── URL builder ────────────────────────────────────────────────────────────────
+function buildUrl(filename: string, driveFileId?: string): string {
+  const params = new URLSearchParams({ folder: 'propuestas', name: filename })
+  if (driveFileId) params.set('driveId', driveFileId)
+  return `/api/documents/file?${params.toString()}`
+}
+
+// ── PCE parser (accepts buffer) ────────────────────────────────────────────────
+async function parsePCE(buf: Buffer, filename: string, driveFileId?: string): Promise<PropuestaItem> {
   const m = filename.match(/^(\d+)-(\d+)-PCE_([A-Z]+)-([A-Z]+)\.pdf$/i)
   const proyectoId  = m ? parseInt(m[1]) : null
   const version     = m ? m[2] : '01'
@@ -55,7 +64,6 @@ async function parsePCE(filePath: string, filename: string): Promise<PropuestaIt
   const codigo      = proyectoId ? `P-${proyectoId}` : filename.replace('.pdf', '')
 
   try {
-    const buf   = fs.readFileSync(filePath)
     const data  = await pdfParse(buf)
     const text  = data.text
     const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean)
@@ -74,7 +82,7 @@ async function parsePCE(filePath: string, filename: string): Promise<PropuestaIt
       proyecto: proyecto || filename,
       especialista,
       comuna: comunaRaw || null,
-      url: `/api/documents/file?folder=propuestas&name=${encodeURIComponent(filename)}`,
+      url: buildUrl(filename, driveFileId),
     }
   } catch {
     return {
@@ -82,49 +90,53 @@ async function parsePCE(filePath: string, filename: string): Promise<PropuestaIt
       docType: 'PCE',
       proyectoId, version, tipo, locCode, codigo,
       contraparte: '', proyecto: filename, especialista: '', comuna: null,
-      url: `/api/documents/file?folder=propuestas&name=${encodeURIComponent(filename)}`,
+      url: buildUrl(filename, driveFileId),
     }
   }
 }
 
-// ── OC parser ──────────────────────────────────────────────────────────────────
-// Filename: "212_OC N°1792 - FRANCISCA SOTO.pdf"  or  "223_OC N°787-1 - ICREA INGENIERIA SPA.pdf"
-async function parseOC(filePath: string, filename: string): Promise<PropuestaItem> {
+// ── OC parser (accepts buffer) ─────────────────────────────────────────────────
+async function parseOC(buf: Buffer, filename: string, driveFileId?: string): Promise<PropuestaItem> {
   const m = filename.match(/^(\d+)_OC\s+N[°o]([\d\-]+)\s*-\s*(.+)\.pdf$/i)
   const proyectoId  = m ? parseInt(m[1]) : null
   const ocNumber    = m ? m[2] : ''
   const contraparte = m ? m[3].trim() : filename.replace('.pdf', '')
   const codigo      = ocNumber ? `OC-${ocNumber}` : 'OC'
 
-  // Try to extract description from PDF
   let proyecto = ''
   try {
-    const buf  = fs.readFileSync(filePath)
-    const data = await pdfParse(buf)
-    const text = data.text
-    // Look for service description lines
+    const data  = await pdfParse(buf)
+    const text  = data.text
     const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean)
     const descIdx = lines.findIndex(l =>
-      /Producto\s*\/\s*Servicio/i.test(l) ||
-      /DESCRIPCIÓN/i.test(l)
+      /Producto\s*\/\s*Servicio/i.test(l) || /DESCRIPCIÓN/i.test(l)
     )
-    if (descIdx >= 0 && lines[descIdx + 1]) {
-      proyecto = lines[descIdx + 1].trim()
-    }
+    if (descIdx >= 0 && lines[descIdx + 1]) proyecto = lines[descIdx + 1].trim()
   } catch { /* ignore */ }
 
   return {
-    id:          filename.replace(/\.pdf$/i, ''),
-    docType:     'OC',
+    id:           filename.replace(/\.pdf$/i, ''),
+    docType:      'OC',
     proyectoId,
     ocNumber,
     codigo,
     contraparte,
-    proyecto:    proyecto || `Orden de Compra N°${ocNumber}`,
+    proyecto:     proyecto || `Orden de Compra N°${ocNumber}`,
     especialista: contraparte,
     comuna:       null,
-    url:          `/docs/propuestas/${encodeURIComponent(filename)}`,
+    url:          buildUrl(filename, driveFileId),
   }
+}
+
+// ── Parse one file (local or Drive buffer) ─────────────────────────────────────
+async function parseFile(
+  filename:    string,
+  buf:         Buffer,
+  driveFileId?: string,
+): Promise<PropuestaItem | null> {
+  if (/^[\d]+-\d+-PCE_/i.test(filename)) return parsePCE(buf, filename, driveFileId)
+  if (/_OC\s+N[°o]/i.test(filename))     return parseOC(buf, filename, driveFileId)
+  return null
 }
 
 // ── Module-level cache ────────────────────────────────────────────────────────
@@ -134,36 +146,61 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const refresh = searchParams.get('refresh') === '1'
 
-  const dir = PROPUESTAS_DIR
-  if (!fs.existsSync(dir)) return NextResponse.json({ propuestas: [] })
-
-  // ── 1. Parse PDFs ─────────────────────────────────────────────────────────
   if (!cache || refresh) {
-    const files = fs.readdirSync(dir).filter(f => /\.pdf$/i.test(f)).sort()
+    const useDrive = isDriveConfigured() && !!DRIVE_PROPUESTAS_ID
 
-    const parsed = await Promise.all(files.map(f => {
-      const filePath = path.join(dir, f)
-      if (/^[\d]+-\d+-PCE_/i.test(f)) return parsePCE(filePath, f)
-      if (/_OC\s+N[°o]/i.test(f))     return parseOC(filePath, f)
-      return null
-    }))
+    let fileEntries: { filename: string; buf: Buffer; driveFileId?: string }[] = []
 
-    cache = (parsed.filter(Boolean) as PropuestaItem[])
-      // Sort by proyectoId asc, then PCE before OC
-      .sort((a, b) => {
-        const idDiff = (a.proyectoId ?? 9999) - (b.proyectoId ?? 9999)
-        if (idDiff !== 0) return idDiff
-        if (a.docType === 'PCE' && b.docType === 'OC') return -1
-        if (a.docType === 'OC' && b.docType === 'PCE') return  1
-        return a.id.localeCompare(b.id)
-      })
+    if (useDrive) {
+      // ── Google Drive ───────────────────────────────────────────────────────
+      const driveFiles = await listDrivePDFs(DRIVE_PROPUESTAS_ID!)
+      const pdfs = driveFiles.filter(f => /\.pdf$/i.test(f.name))
+      // Download all in parallel (propuestas folder is small)
+      const results = await Promise.allSettled(
+        pdfs.map(async f => ({
+          filename:    f.name,
+          buf:         await getDriveFileBuffer(f.id),
+          driveFileId: f.id,
+        }))
+      )
+      for (const r of results) {
+        if (r.status === 'fulfilled') fileEntries.push(r.value)
+      }
+    } else {
+      // ── Local file system ──────────────────────────────────────────────────
+      if (!fs.existsSync(PROPUESTAS_DIR)) {
+        cache = []
+      } else {
+        const files = fs.readdirSync(PROPUESTAS_DIR).filter(f => /\.pdf$/i.test(f)).sort()
+        for (const f of files) {
+          try {
+            const buf = fs.readFileSync(path.join(PROPUESTAS_DIR, f))
+            fileEntries.push({ filename: f, buf })
+          } catch { /* skip */ }
+        }
+      }
+    }
+
+    if (!cache) {
+      const parsed = await Promise.all(
+        fileEntries.map(e => parseFile(e.filename, e.buf, e.driveFileId))
+      )
+      cache = (parsed.filter(Boolean) as PropuestaItem[])
+        .sort((a, b) => {
+          const idDiff = (a.proyectoId ?? 9999) - (b.proyectoId ?? 9999)
+          if (idDiff !== 0) return idDiff
+          if (a.docType === 'PCE' && b.docType === 'OC') return -1
+          if (a.docType === 'OC' && b.docType === 'PCE') return  1
+          return a.id.localeCompare(b.id)
+        })
+    }
   }
 
-  // ── 2. Supabase overrides ─────────────────────────────────────────────────
+  // ── Supabase overrides ─────────────────────────────────────────────────────
   let overrides: Record<string, import('@/lib/db').PropuestaOverride> = {}
   try { overrides = await getPropuestaOverrides() } catch { /* offline */ }
 
-  // ── 3. Merge ──────────────────────────────────────────────────────────────
+  // ── Merge ──────────────────────────────────────────────────────────────────
   const merged = cache.map(p => {
     const ov = overrides[p.id]
     if (!ov) return p
