@@ -163,8 +163,9 @@ export function DocumentosModule() {
   const isMobile = useIsMobile()
   const [docs,      setDocs]      = useState<DocItem[]>([])
   const [overrides, setOverrides] = useState<Overrides>({})
-  const [loading,   setLoading]   = useState(true)
-  const [error,     setError]     = useState<string | null>(null)
+  const [loading,    setLoading]    = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error,      setError]      = useState<string | null>(null)
 
   // Filters
   const [tipoF,   setTipoF]   = useState<TipoFilter>('todos')
@@ -176,16 +177,21 @@ export function DocumentosModule() {
   const [editingDate, setEditingDate] = useState<string | null>(null)
 
   // ── Load data ────────────────────────────────────────────────────────────────
-  useEffect(() => {
+  const loadDocs = useCallback((refresh = false) => {
+    if (refresh) setRefreshing(true)
+    else setLoading(true)
+    const url = refresh ? '/api/documents?refresh=1' : '/api/documents'
     Promise.all([
-      fetch('/api/documents').then(r => r.ok ? r.json() : Promise.reject(r.statusText)),
+      fetch(url).then(r => r.ok ? r.json() : Promise.reject(r.statusText)),
       fetch('/api/document-overrides').then(r => r.ok ? r.json() : {}),
     ]).then(([docsData, ovData]: [{ docs: DocItem[] }, Overrides]) => {
       setDocs(docsData.docs ?? [])
       setOverrides(ovData ?? {})
-      setLoading(false)
-    }).catch(e => { setError(String(e)); setLoading(false) })
+    }).catch(e => { setError(String(e)) })
+      .finally(() => { setLoading(false); setRefreshing(false) })
   }, [])
+
+  useEffect(() => { loadDocs() }, [loadDocs])
 
   // ── Effective values (with overrides) ─────────────────────────────────────────
   const effectiveFecha  = useCallback((d: DocItem) => overrides[d.id]?.fecha  ?? d.fecha,  [overrides])
@@ -262,15 +268,30 @@ export function DocumentosModule() {
             <h1 style={{ margin: 0, fontSize: isMobile ? 18 : 22, fontWeight: 700, color: C.textPrimary }}>Documentos Tributarios</h1>
             {!isMobile && <p style={{ margin: '2px 0 0', fontSize: 13, color: C.textSec }}>Facturas y boletas de honorarios 2026</p>}
           </div>
-          {!loading && filtered.length > 0 && (
-            <button onClick={() => exportCSV(csvRows)} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', borderRadius: 8, cursor: 'pointer',
-              fontSize: 13, fontWeight: 600, background: C.orange, color: '#fff', border: 'none',
-            }}>
-              ↓ Exportar CSV
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => loadDocs(true)}
+              disabled={refreshing}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', borderRadius: 8, cursor: refreshing ? 'default' : 'pointer',
+                fontSize: 13, fontWeight: 600, border: `1px solid ${C.border}`,
+                background: refreshing ? C.listBg : '#fff', color: refreshing ? C.textMuted : C.textPrimary,
+                opacity: refreshing ? 0.7 : 1, transition: 'all 0.15s',
+              }}
+            >
+              {refreshing ? '↻ Actualizando…' : '↻ Actualizar'}
             </button>
-          )}
+            {!loading && filtered.length > 0 && (
+              <button onClick={() => exportCSV(csvRows)} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', borderRadius: 8, cursor: 'pointer',
+                fontSize: 13, fontWeight: 600, background: C.orange, color: '#fff', border: 'none',
+              }}>
+                ↓ Exportar CSV
+              </button>
+            )}
+          </div>
         </div>
 
         {/* ── Filters ─── */}

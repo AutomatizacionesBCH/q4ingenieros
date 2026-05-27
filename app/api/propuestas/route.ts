@@ -9,6 +9,8 @@ import type { PropuestaItem, DocType } from '@/lib/propuesta-utils'
 export type { PropuestaItem, DocType }
 export const dynamic = 'force-dynamic'
 
+const PROPUESTAS_DIR = process.env.DOCS_PROPUESTAS_PATH ?? path.join(process.cwd(), 'public', 'docs', 'propuestas')
+
 // ── Date helpers ───────────────────────────────────────────────────────────────
 const MESES: Record<string, string> = {
   enero:'01', febrero:'02', marzo:'03', abril:'04', mayo:'05', junio:'06',
@@ -72,7 +74,7 @@ async function parsePCE(filePath: string, filename: string): Promise<PropuestaIt
       proyecto: proyecto || filename,
       especialista,
       comuna: comunaRaw || null,
-      url: `/docs/propuestas/${encodeURIComponent(filename)}`,
+      url: `/api/documents/file?folder=propuestas&name=${encodeURIComponent(filename)}`,
     }
   } catch {
     return {
@@ -80,7 +82,7 @@ async function parsePCE(filePath: string, filename: string): Promise<PropuestaIt
       docType: 'PCE',
       proyectoId, version, tipo, locCode, codigo,
       contraparte: '', proyecto: filename, especialista: '', comuna: null,
-      url: `/docs/propuestas/${encodeURIComponent(filename)}`,
+      url: `/api/documents/file?folder=propuestas&name=${encodeURIComponent(filename)}`,
     }
   }
 }
@@ -132,7 +134,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const refresh = searchParams.get('refresh') === '1'
 
-  const dir = path.join(process.cwd(), 'public', 'docs', 'propuestas')
+  const dir = PROPUESTAS_DIR
   if (!fs.existsSync(dir)) return NextResponse.json({ propuestas: [] })
 
   // ── 1. Parse PDFs ─────────────────────────────────────────────────────────

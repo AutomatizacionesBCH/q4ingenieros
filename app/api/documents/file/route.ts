@@ -4,8 +4,9 @@ import fs from 'fs'
 
 export const dynamic = 'force-dynamic'
 
-const BOLETAS_DIR  = process.env.DOCS_BOLETAS_PATH  ?? path.join(process.cwd(), 'data', 'boletas')
-const FACTURAS_DIR = process.env.DOCS_FACTURAS_PATH ?? path.join(process.cwd(), 'data', 'facturas')
+const BOLETAS_DIR   = process.env.DOCS_BOLETAS_PATH   ?? path.join(process.cwd(), 'public', 'docs', 'boletas')
+const FACTURAS_DIR  = process.env.DOCS_FACTURAS_PATH  ?? path.join(process.cwd(), 'public', 'docs', 'facturas')
+const PROPUESTAS_DIR = process.env.DOCS_PROPUESTAS_PATH ?? path.join(process.cwd(), 'public', 'docs', 'propuestas')
 
 /**
  * GET /api/documents/file?folder=boletas&name=Boleta+N%C2%B0197+...pdf
@@ -18,11 +19,15 @@ export async function GET(req: NextRequest) {
     const folder   = req.nextUrl.searchParams.get('folder')
     const name     = req.nextUrl.searchParams.get('name')
 
-    if (!folder || !name || !['boletas', 'facturas'].includes(folder)) {
+    if (!folder || !name || !['boletas', 'facturas', 'propuestas'].includes(folder)) {
       return NextResponse.json({ error: 'Parámetros inválidos' }, { status: 400 })
     }
 
-    const baseDir  = folder === 'boletas' ? BOLETAS_DIR : FACTURAS_DIR
+    const baseDir =
+      folder === 'boletas'   ? BOLETAS_DIR   :
+      folder === 'facturas'  ? FACTURAS_DIR  :
+                               PROPUESTAS_DIR
+
     // Sanitize: only allow basename (strip any directory traversal)
     const safe     = path.basename(name)
     const filePath = path.join(baseDir, safe)

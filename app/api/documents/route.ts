@@ -10,6 +10,10 @@ process.env['PDFJS_DISABLE_WORKER'] = '1'
 
 export const dynamic = 'force-dynamic'
 
+// ── Paths configurables por env var (funciona con Google Drive, OneDrive, etc.) ──
+const BOLETAS_PATH  = process.env.DOCS_BOLETAS_PATH  ?? path.join(process.cwd(), 'public', 'docs', 'boletas')
+const FACTURAS_PATH = process.env.DOCS_FACTURAS_PATH ?? path.join(process.cwd(), 'public', 'docs', 'facturas')
+
 // ── Caché a nivel de módulo (persiste en producción — igual que workbook) ──────
 interface DocsCache { docs: DocItem[]; ts: number }
 let _cache: DocsCache | null = null
@@ -128,12 +132,11 @@ function parseDoc(filename: string, folder: 'boletas' | 'facturas'): DocItem {
     descripcion,
     referencia,
     fecha: extractDateFromFilename(base),
-    url:   `/docs/${folder}/${encodeURIComponent(filename)}`,
+    url:   `/api/documents/file?folder=${folder}&name=${encodeURIComponent(filename)}`,
   }
 }
 
-function readFolder(docsRoot: string, folder: 'boletas' | 'facturas'): DocItem[] {
-  const dir = path.join(docsRoot, folder)
+function readFolder(dir: string, folder: 'boletas' | 'facturas'): DocItem[] {
   if (!fs.existsSync(dir)) return []
   try {
     return fs.readdirSync(dir)
@@ -147,15 +150,18 @@ function readFolder(docsRoot: string, folder: 'boletas' | 'facturas'): DocItem[]
 // ── Extracción de fechas PDF en background (fire & forget) ───────────────────
 // Procesa en lotes paralelos de 5 para no saturar el sistema.
 // Actualiza Supabase y el caché en memoria sin bloquear la respuesta.
+function folderPath(folder: 'boletas' | 'facturas'): string {
+  return folder === 'boletas' ? BOLETAS_PATH : FACTURAS_PATH
+}
+
 async function extractDatesBackground(
   missing: DocItem[],
-  docsRoot: string,
 ): Promise<void> {
   const BATCH = 5
   for (let i = 0; i < missing.length; i += BATCH) {
     const batch = missing.slice(i, i + BATCH)
     await Promise.allSettled(batch.map(async doc => {
-      const filePath  = path.join(docsRoot, doc.folder, doc.filename)
+      const filePath  = path.join(folderPath(doc.folder), doc.filename)
       const extracted = await extractDateFromPDF(filePath)
       if (extracted) {
         await setDocOverride(doc.id, { fecha: extracted })
@@ -174,16 +180,14 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const refresh = searchParams.get('refresh') === '1'
 
-  const docsRoot = path.join(process.cwd(), 'public', 'docs')
-
   // ── 1. Servir desde caché si está vigente ─────────────────────────────────────
   if (_cache && !refresh && Date.now() - _cache.ts < CACHE_TTL) {
     return NextResponse.json({ docs: _cache.docs })
   }
 
   // ── 2. Listar archivos ────────────────────────────────────────────────────────
-  const boletas  = readFolder(docsRoot, 'boletas')
-  const facturas = readFolder(docsRoot, 'facturas')
+  const boletas  = readFolder(BOLETAS_PATH,  'boletas')
+  const facturas = readFolder(FACTURAS_PATH, 'facturas')
 
   const all = [
     ...facturas.sort((a, b) => (b.numero ?? 0) - (a.numero ?? 0)),
@@ -214,7 +218,7 @@ export async function GET(req: Request) {
     : all.filter(doc => !overrides[doc.id]?.fecha)
 
   if (missing.length > 0) {
-    extractDatesBackground(missing, docsRoot).catch(console.error)
+    extractDatesBackground(missing).catch(console.error)
   }
 
   return NextResponse.json({ docs: merged })

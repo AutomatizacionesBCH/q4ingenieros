@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import type { PropuestaItem } from '@/lib/propuesta-utils'
 import { tipoLabel } from '@/lib/propuesta-utils'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -184,6 +184,7 @@ export function PropuestasModule() {
 
   const [propuestas, setPropuestas] = useState<PropuestaItem[]>([])
   const [loading,    setLoading]    = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error,      setError]      = useState<string | null>(null)
   const [saving,     setSaving]     = useState<string | null>(null)
 
@@ -192,15 +193,20 @@ export function PropuestasModule() {
   const [search, setSearch] = useState('')
 
   // ── Load ──────────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    fetch('/api/propuestas')
+  const loadPropuestas = useCallback((refresh = false) => {
+    if (refresh) setRefreshing(true)
+    else setLoading(true)
+    const url = refresh ? '/api/propuestas?refresh=1' : '/api/propuestas'
+    fetch(url)
       .then(r => r.json())
       .then((d: { propuestas: PropuestaItem[] }) => {
         setPropuestas(d.propuestas ?? [])
-        setLoading(false)
       })
-      .catch(e => { setError(String(e)); setLoading(false) })
+      .catch(e => { setError(String(e)) })
+      .finally(() => { setLoading(false); setRefreshing(false) })
   }, [])
+
+  useEffect(() => { loadPropuestas() }, [loadPropuestas])
 
   // ── Save field ────────────────────────────────────────────────────────────────
   async function saveField(group: PropuestaGroup, field: EditableField, value: string) {
@@ -306,6 +312,19 @@ export function PropuestasModule() {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {saving && <span style={{ fontSize: 11, color: C.textMuted, fontStyle: 'italic' }}>Guardando…</span>}
+          <button
+            onClick={() => loadPropuestas(true)}
+            disabled={refreshing}
+            style={{
+              padding: '7px 14px', borderRadius: 7, border: `1px solid ${C.border}`,
+              background: refreshing ? C.canvas : C.card,
+              color: refreshing ? C.textMuted : C.textPrimary,
+              fontSize: 12, fontWeight: 600, cursor: refreshing ? 'default' : 'pointer',
+              opacity: refreshing ? 0.7 : 1, transition: 'all 0.15s',
+            }}
+          >
+            {refreshing ? '↻ Actualizando…' : '↻ Actualizar'}
+          </button>
           <button
             onClick={() => exportCSV(filtered)}
             style={{
