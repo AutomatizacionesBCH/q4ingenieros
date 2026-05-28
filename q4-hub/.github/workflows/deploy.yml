@@ -1,0 +1,19 @@
+name: Deploy to Easypanel
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'q4-hub/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trigger Easypanel deploy
+        run: |
+          curl -X POST "${{ secrets.EASYPANEL_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{"app": "demo"}'
