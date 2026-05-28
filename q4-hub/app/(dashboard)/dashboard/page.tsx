@@ -12,10 +12,11 @@ export default async function DashboardPage() {
   // Diagnóstico de variables de entorno (mascarado)
   const dbPreview = dbUrl === 'NOT SET' ? 'NOT SET' : dbUrl.slice(0, 40) + '…'
 
+  type TxRow = { id: number; description: string; gross: unknown; paymentDate: Date | null; costCenter: { code: string } | null; provider: { name: string } | null }
   let dbError: string | null = null
   let totalPendiente: { _sum: { gross: unknown } } = { _sum: { gross: 0 } }
   let totalPagadoMes: { _sum: { gross: unknown } } = { _sum: { gross: 0 } }
-  let proximosPagos: unknown[] = []
+  let proximosPagos: TxRow[] = []
   let ingresosYTD: unknown = 0
   let egresosYTD: unknown = 0
 
