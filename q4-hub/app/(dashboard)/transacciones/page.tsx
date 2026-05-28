@@ -1,5 +1,6 @@
 ﻿export const dynamic = 'force-dynamic'
 
+import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { formatCLP, formatDate } from '@/lib/fmt'
 
@@ -42,11 +43,11 @@ export default async function TransaccionesPage({
         </h1>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <span style={{ color: '#8A9BB8', fontSize: 13 }}>{total.toLocaleString('es-CL')} registros</span>
-          <a href="/transacciones/nueva" style={{
+          <Link href="/transacciones/nueva" style={{
             background: '#E5501E', color: '#fff', borderRadius: 8,
             padding: '8px 16px', fontSize: 13, fontWeight: 600,
             textDecoration: 'none',
-          }}>+ Nueva</a>
+          }}>+ Nueva</Link>
         </div>
       </div>
 
@@ -69,8 +70,10 @@ export default async function TransaccionesPage({
                 borderBottom: '1px solid rgba(255,255,255,0.04)',
                 background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
               }}>
-                <td style={{ padding: '9px 14px', color: '#8A9BB8', fontSize: 12, whiteSpace: 'nowrap' }}>
-                  {formatDate(tx.paymentDate)}
+                <td style={{ padding: '9px 14px', fontSize: 12, whiteSpace: 'nowrap' }}>
+                  <Link href={`/transacciones/${tx.id}/editar`} style={{ color: '#E5501E', textDecoration: 'none' }}>
+                    {formatDate(tx.paymentDate)}
+                  </Link>
                 </td>
                 <td style={{ padding: '9px 14px', color: '#8A9BB8', fontSize: 12 }}>
                   {tx.company.name.split(' ')[0]}

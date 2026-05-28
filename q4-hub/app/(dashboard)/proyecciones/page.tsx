@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { formatCLP, formatDate } from '@/lib/fmt'
+import { MarcarPagadoButton } from '@/components/transacciones/MarcarPagadoButton'
 
 export default async function ProyeccionesPage() {
   const now = new Date()
@@ -53,7 +54,7 @@ export default async function ProyeccionesPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-              {['Fecha', 'CeCo', 'Descripción', 'Proveedor', 'Bruto', 'Banco', 'Doc.'].map(h => (
+              {['Fecha', 'CeCo', 'Descripción', 'Proveedor', 'Bruto', 'Banco', 'Doc.', ''].map(h => (
                 <th key={h} style={{
                   padding: '12px 14px', textAlign: h === 'Bruto' ? 'right' : 'left',
                   color: '#5A7090', fontSize: 11, fontWeight: 700,
@@ -91,6 +92,9 @@ export default async function ProyeccionesPage() {
                 <td style={{ padding: '10px 14px', color: '#5A7090', fontSize: 12 }}>
                   {tx.facturaNum ?? tx.boletaNum ?? '—'}
                 </td>
+                <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                  <MarcarPagadoButton txId={tx.id} />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -101,7 +105,7 @@ export default async function ProyeccionesPage() {
                 textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>
                 {formatCLP(total)}
               </td>
-              <td colSpan={2} />
+              <td colSpan={3} />
             </tr>
           </tfoot>
         </table>
