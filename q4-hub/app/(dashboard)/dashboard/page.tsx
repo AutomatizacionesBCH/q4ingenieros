@@ -1,4 +1,4 @@
-﻿export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic'
 
 import { prisma } from '@/lib/prisma'
 import { formatCLP } from '@/lib/fmt'
@@ -6,39 +6,40 @@ import { FlujoCajaChart } from '@/components/dashboard/FlujoCajaChart'
 import { PagosProximosWidget } from '@/components/dashboard/PagosProximosWidget'
 
 export default async function DashboardPage() {
-  const dbUrl = process.env.DATABASE_URL ?? 'NOT SET'
-  const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'NOT SET'
+  const now = new Date()
+  const nextWeek = new Date(now.getTime() + 7 * 86400000)
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const startOfYear = new Date(now.getFullYear(), 0, 1)
 
-  // Diagnóstico de variables de entorno (mascarado)
-  const dbPreview = dbUrl === 'NOT SET' ? 'NOT SET' : dbUrl.slice(0, 40) + '…'
+  const [pend, pagado, proximos, mensual] = await Promise.all([
+    prisma.transaction.aggregate({
+      where: { status: 'PENDIENTE', movementType: 'EGRESO' },
+      _sum: { gross: true },
+    }),
+    prisma.transaction.aggregate({
+      where: { status: 'PAGADO', movementType: 'EGRESO', paymentDate: { gte: startOfMonth } },
+      _sum: { gross: true },
+    }),
+    prisma.transaction.findMany({
+      where: { status: 'PENDIENTE', paymentDate: { lte: nextWeek } },
+      include: {
+        costCenter: { select: { code: true, name: true } },
+        provider: { select: { name: true } },
+      },
+      orderBy: { paymentDate: 'asc' },
+      take: 10,
+    }),
+    prisma.transaction.groupBy({
+      by: ['movementType'],
+      where: { paymentDate: { gte: startOfYear }, status: { not: 'NULO' } },
+      _sum: { net: true },
+    }),
+  ])
 
-  type TxRow = { id: number; description: string; gross: unknown; paymentDate: Date | null; costCenter: { code: string } | null; provider: { name: string } | null }
-  let dbError: string | null = null
-  let totalPendiente: { _sum: { gross: unknown } } = { _sum: { gross: 0 } }
-  let totalPagadoMes: { _sum: { gross: unknown } } = { _sum: { gross: 0 } }
-  let proximosPagos: TxRow[] = []
-  let ingresosYTD: unknown = 0
-  let egresosYTD: unknown = 0
-
-  try {
-    const now = new Date()
-    const nextWeek = new Date(now.getTime() + 7 * 86400000)
-    const startOfYear = new Date(now.getFullYear(), 0, 1)
-
-    const [pend, pagado, proximos, mensual] = await Promise.all([
-      prisma.transaction.aggregate({ where: { status: 'PENDIENTE', movementType: 'EGRESO' }, _sum: { gross: true } }),
-      prisma.transaction.aggregate({ where: { status: 'PAGADO', movementType: 'EGRESO', paymentDate: { gte: new Date(now.getFullYear(), now.getMonth(), 1) } }, _sum: { gross: true } }),
-      prisma.transaction.findMany({ where: { status: 'PENDIENTE', paymentDate: { lte: nextWeek } }, include: { costCenter: { select: { code: true, name: true } }, provider: { select: { name: true } } }, orderBy: { paymentDate: 'asc' }, take: 10 }),
-      prisma.transaction.groupBy({ by: ['movementType'], where: { paymentDate: { gte: startOfYear }, status: { not: 'NULO' } }, _sum: { net: true } }),
-    ])
-    totalPendiente = pend
-    totalPagadoMes = pagado
-    proximosPagos = proximos
-    ingresosYTD = mensual.find(m => m.movementType === 'INGRESO')?._sum.net ?? 0
-    egresosYTD = mensual.find(m => m.movementType === 'EGRESO')?._sum.net ?? 0
-  } catch (e) {
-    dbError = (e as Error).message
-  }
+  const ingresosYTD = Number(mensual.find(m => m.movementType === 'INGRESO')?._sum.net ?? 0)
+  const egresosYTD = Number(mensual.find(m => m.movementType === 'EGRESO')?._sum.net ?? 0)
+  const totalPendiente = Number(pend._sum.gross ?? 0)
+  const totalPagadoMes = Number(pagado._sum.gross ?? 0)
 
   return (
     <div style={{ padding: 32 }}>
@@ -46,18 +47,11 @@ export default async function DashboardPage() {
         Dashboard
       </h1>
 
-      {/* Debug panel — visible si hay error o variables faltantes */}
-      <div style={{ background: '#162138', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: 16, marginBottom: 24, fontSize: 12 }}>
-        <div style={{ color: '#5A7090', marginBottom: 6 }}>DB: <span style={{ color: dbUrl === 'NOT SET' ? '#C0392B' : '#3D8B5E' }}>{dbPreview}</span></div>
-        <div style={{ color: '#5A7090' }}>SUPABASE_URL: <span style={{ color: supaUrl === 'NOT SET' ? '#C0392B' : '#3D8B5E' }}>{supaUrl === 'NOT SET' ? 'NOT SET' : '✓ ' + supaUrl.slice(0, 30)}</span></div>
-        {dbError && <div style={{ color: '#C0392B', marginTop: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>ERROR: {dbError}</div>}
-      </div>
-
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 }}>
         {[
-          { label: 'Pendiente por pagar', value: formatCLP(Number(totalPendiente._sum.gross)), color: '#D4A017' },
-          { label: 'Pagado este mes', value: formatCLP(Number(totalPagadoMes._sum.gross)), color: '#3D8B5E' },
-          { label: 'Balance YTD', value: formatCLP(Number(ingresosYTD) - Number(egresosYTD)), color: '#F0EDE8' },
+          { label: 'Pendiente por pagar', value: formatCLP(totalPendiente), color: '#D4A017' },
+          { label: 'Pagado este mes', value: formatCLP(totalPagadoMes), color: '#3D8B5E' },
+          { label: 'Balance YTD', value: formatCLP(ingresosYTD - egresosYTD), color: '#F0EDE8' },
         ].map(kpi => (
           <div key={kpi.label} style={{
             background: '#162138', borderRadius: 12,
@@ -76,7 +70,7 @@ export default async function DashboardPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 20 }}>
         <FlujoCajaChart />
-        <PagosProximosWidget pagos={proximosPagos.map(p => ({
+        <PagosProximosWidget pagos={proximos.map(p => ({
           id: p.id, description: p.description,
           gross: Number(p.gross), paymentDate: p.paymentDate?.toISOString() ?? null,
           costCenter: p.costCenter?.code ?? null,

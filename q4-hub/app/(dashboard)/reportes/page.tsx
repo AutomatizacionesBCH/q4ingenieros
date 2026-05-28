@@ -25,8 +25,17 @@ export default async function ReportesPage() {
 
   return (
     <div style={{ padding: 32 }}>
-      <h1 style={{ color: '#F0EDE8', fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Reportes</h1>
-      <div style={{ color: '#8A9BB8', fontSize: 13, marginBottom: 28 }}>Estado de Resultados YTD {year}</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
+        <div>
+          <h1 style={{ color: '#F0EDE8', fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Reportes</h1>
+          <div style={{ color: '#8A9BB8', fontSize: 13 }}>Estado de Resultados YTD {year}</div>
+        </div>
+        <a href={`/api/reportes/export?year=${year}`} style={{
+          background: '#3D8B5E', color: '#fff', borderRadius: 8,
+          padding: '8px 16px', fontSize: 13, fontWeight: 600, textDecoration: 'none',
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+        }}>↓ Exportar a Excel</a>
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
         {resumen.map(r => (
