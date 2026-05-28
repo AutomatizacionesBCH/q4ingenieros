@@ -1,30 +1,101 @@
-﻿export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic'
 
 import { prisma } from '@/lib/prisma'
 import { formatCLP, formatDate } from '@/lib/fmt'
+import { RegistroSaldoForm } from '@/components/bancos/RegistroSaldoForm'
+import { DeleteSaldoButton } from '@/components/bancos/DeleteSaldoButton'
+
+const BANK_LABELS: Record<string, string> = {
+  CHILE: 'Banco de Chile', BCI: 'BCI', ITAU: 'Itaú', SANTANDER: 'Santander',
+}
+const BANKS: Array<'CHILE' | 'BCI' | 'ITAU' | 'SANTANDER'> = ['CHILE', 'BCI', 'ITAU', 'SANTANDER']
 
 export default async function BancosPage() {
-  const saldos = await prisma.bankBalance.findMany({
-    include: { company: { select: { name: true } } },
-    orderBy: { recordedAt: 'desc' },
-    take: 50,
-  })
+  const [companies, saldos] = await Promise.all([
+    prisma.company.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    prisma.bankBalance.findMany({
+      include: { company: { select: { id: true, name: true } } },
+      orderBy: { recordedAt: 'desc' },
+      take: 200,
+    }),
+  ])
 
-  const BANK_LABELS: Record<string, string> = {
-    CHILE: 'Banco de Chile', BCI: 'BCI', ITAU: 'Itaú', SANTANDER: 'Santander',
+  // Calcular saldo actual (último registro) por banco + empresa + tipo
+  type LatestKey = string
+  const latest = new Map<LatestKey, typeof saldos[number]>()
+  for (const s of saldos) {
+    const key = `${s.bank}|${s.companyId}|${s.type}`
+    if (!latest.has(key)) latest.set(key, s)
   }
+
+  // Totales por banco (sumando empresas, solo CONTABLE)
+  const totalsByBank = new Map<string, number>()
+  for (const s of latest.values()) {
+    if (s.type !== 'CONTABLE') continue
+    totalsByBank.set(s.bank, (totalsByBank.get(s.bank) ?? 0) + Number(s.balance))
+  }
+  const totalContable = Array.from(totalsByBank.values()).reduce((a, b) => a + b, 0)
 
   return (
     <div style={{ padding: 32 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h1 style={{ color: '#F0EDE8', fontSize: 22, fontWeight: 700, margin: 0 }}>Bancos</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+        <div>
+          <h1 style={{ color: '#F0EDE8', fontSize: 22, fontWeight: 700, margin: 0 }}>Bancos</h1>
+          <div style={{ color: '#8A9BB8', fontSize: 13, marginTop: 4 }}>
+            Saldo contable total: <span style={{ color: '#3D8B5E', fontWeight: 700 }}>{formatCLP(totalContable)}</span>
+          </div>
+        </div>
+        <RegistroSaldoForm companies={companies} />
+      </div>
+
+      {/* Cards: saldo actual por banco */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+        gap: 14, marginBottom: 28 }}>
+        {BANKS.map(bank => {
+          const total = totalsByBank.get(bank) ?? 0
+          const filas = Array.from(latest.values()).filter(s => s.bank === bank && s.type === 'CONTABLE')
+          return (
+            <div key={bank} style={{
+              background: '#162138', borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.08)', padding: '16px 18px',
+            }}>
+              <div style={{ color: '#5A7090', fontSize: 10, fontWeight: 700,
+                textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+                {BANK_LABELS[bank]}
+              </div>
+              <div style={{ color: total >= 0 ? '#F0EDE8' : '#C0392B', fontSize: 20, fontWeight: 700,
+                fontVariantNumeric: 'tabular-nums', marginBottom: 10 }}>
+                {formatCLP(total)}
+              </div>
+              {filas.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {filas.map(f => (
+                    <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                      <span style={{ color: '#8A9BB8' }}>{f.company.name.split(' ')[0]}</span>
+                      <span style={{ color: '#F0EDE8', fontVariantNumeric: 'tabular-nums' }}>{formatCLP(Number(f.balance))}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ color: '#5A7090', fontSize: 11, fontStyle: 'italic' }}>Sin registros</div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Histórico */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <h2 style={{ color: '#F0EDE8', fontSize: 14, fontWeight: 700, margin: 0,
+          textTransform: 'uppercase', letterSpacing: '0.06em' }}>Histórico</h2>
+        <span style={{ color: '#5A7090', fontSize: 11 }}>Últimos {saldos.length}</span>
       </div>
 
       <div style={{ background: '#162138', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-              {['Banco', 'Empresa', 'Tipo', 'Saldo', 'Fecha registro'].map(h => (
+              {['Fecha', 'Banco', 'Empresa', 'Tipo', 'Saldo', ''].map(h => (
                 <th key={h} style={{
                   padding: '12px 16px', textAlign: h === 'Saldo' ? 'right' : 'left',
                   color: '#5A7090', fontSize: 11, fontWeight: 700,
@@ -39,6 +110,9 @@ export default async function BancosPage() {
                 borderBottom: '1px solid rgba(255,255,255,0.04)',
                 background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
               }}>
+                <td style={{ padding: '10px 16px', color: '#8A9BB8', fontSize: 12, whiteSpace: 'nowrap' }}>
+                  {formatDate(s.recordedAt)}
+                </td>
                 <td style={{ padding: '10px 16px', color: '#F0EDE8', fontSize: 13, fontWeight: 600 }}>
                   {BANK_LABELS[s.bank] ?? s.bank}
                 </td>
@@ -54,15 +128,15 @@ export default async function BancosPage() {
                   fontSize: 14, fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>
                   {formatCLP(Number(s.balance))}
                 </td>
-                <td style={{ padding: '10px 16px', color: '#5A7090', fontSize: 12 }}>
-                  {formatDate(s.recordedAt)}
+                <td style={{ padding: '10px 16px', textAlign: 'right' }}>
+                  <DeleteSaldoButton id={s.id} />
                 </td>
               </tr>
             ))}
             {saldos.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ padding: '32px 16px', textAlign: 'center', color: '#5A7090', fontSize: 13 }}>
-                  Sin saldos bancarios registrados
+                <td colSpan={6} style={{ padding: '32px 16px', textAlign: 'center', color: '#5A7090', fontSize: 13 }}>
+                  Sin saldos bancarios registrados — usa el botón &ldquo;+ Registrar saldo&rdquo; arriba
                 </td>
               </tr>
             )}
