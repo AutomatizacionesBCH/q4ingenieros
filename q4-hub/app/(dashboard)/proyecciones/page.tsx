@@ -2,13 +2,9 @@ export const dynamic = 'force-dynamic'
 
 import { prisma } from '@/lib/prisma'
 import { formatCLP, formatDate } from '@/lib/fmt'
-import { MarcarPagadoButton } from '@/components/transacciones/MarcarPagadoButton'
+import { StatusBadge } from '@/components/transacciones/StatusBadge'
 import { ProyeccionesFilters } from '@/components/proyecciones/ProyeccionesFilters'
 import type { Prisma } from '@prisma/client'
-
-const STATUS_COLORS: Record<string, string> = {
-  PAGADO: '#3D8B5E', PENDIENTE: '#D4A017', NULO: '#5A7090',
-}
 
 function getWeekRange() {
   const now = new Date()
@@ -120,7 +116,7 @@ export default async function ProyeccionesPage({
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-              {['Fecha', 'Empresa', 'CeCo', 'Descripción', 'Proveedor', 'Cuenta', 'Bruto', 'Estado', 'Acción'].map(h => (
+              {['Fecha', 'Empresa', 'CeCo', 'Descripción', 'Proveedor', 'Cuenta', 'Bruto', 'Estado'].map(h => (
                 <th key={h} style={{
                   padding: '12px 14px', textAlign: h === 'Bruto' ? 'right' : 'left',
                   color: '#5A7090', fontSize: 11, fontWeight: 700,
@@ -162,22 +158,13 @@ export default async function ProyeccionesPage({
                   {formatCLP(Number(tx.gross))}
                 </td>
                 <td style={{ padding: '10px 14px' }}>
-                  <span style={{
-                    background: STATUS_COLORS[tx.status] + '22',
-                    color: STATUS_COLORS[tx.status],
-                    borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700,
-                  }}>{tx.status}</span>
-                </td>
-                <td style={{ padding: '10px 14px', textAlign: 'right' }}>
-                  {tx.status !== 'NULO' && (
-                    <MarcarPagadoButton txId={tx.id} currentStatus={tx.status} />
-                  )}
+                  <StatusBadge txId={tx.id} status={tx.status} />
                 </td>
               </tr>
             ))}
             {pagos.length === 0 && (
               <tr>
-                <td colSpan={9} style={{ padding: '32px 14px', textAlign: 'center', color: '#5A7090', fontSize: 13 }}>
+                <td colSpan={8} style={{ padding: '32px 14px', textAlign: 'center', color: '#5A7090', fontSize: 13 }}>
                   Sin transacciones en este rango
                 </td>
               </tr>
@@ -190,7 +177,7 @@ export default async function ProyeccionesPage({
                 textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>
                 {formatCLP(totalGeneral)}
               </td>
-              <td colSpan={2} />
+              <td />
             </tr>
           </tfoot>
         </table>

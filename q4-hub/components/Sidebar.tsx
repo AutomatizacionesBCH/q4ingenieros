@@ -16,6 +16,7 @@ const MODULES = [
   { href: '/',                    label: 'Dashboard',           short: 'Home',    icon: '◈' },
   { href: '/transacciones',       label: 'Transacciones',       short: 'BD',      icon: '⬡' },
   { href: '/proyecciones',        label: 'Proyecciones',        short: 'Pagos',   icon: '◉' },
+  { href: '/flujo-ceco',          label: 'Flujo por CeCo',      short: 'CeCo F',  icon: '◐' },
   { href: '/facturas-emitidas',   label: 'Facturas Emitidas',   short: 'Facturas',icon: '◧' },
   { href: '/ordenes-compra',      label: 'Órdenes de Compra',   short: 'OC',      icon: '◎' },
   { href: '/propuestas-cierre',   label: 'Propuestas Cierre',   short: 'Cierres', icon: '◫' },
