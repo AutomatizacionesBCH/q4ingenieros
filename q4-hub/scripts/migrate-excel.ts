@@ -1,10 +1,36 @@
 import * as XLSX from 'xlsx'
 import { prisma } from '../lib/prisma'
+import type { Prisma } from '@prisma/client'
 
 const FILE = 'c:/Users/alcha/OneDrive/Desktop/Proyectos IA/Proyecto Q4 Completo/1. Flujo 2024 - 2026 (18-05-2026).xlsx'
+const BATCH = 500
+
+const parseDate = (v: unknown): Date | null => {
+  if (!v) return null
+  if (v instanceof Date) {
+    if (isNaN(v.getTime())) return null
+    const y = v.getFullYear()
+    // Excel serial stored as year (e.g. 45293 = Jan 2024 serial)
+    if (y > 2100) {
+      const d = new Date(Math.round((y - 25569) * 86400 * 1000))
+      return isNaN(d.getTime()) || d.getFullYear() > 2100 ? null : d
+    }
+    return y < 1900 ? null : v
+  }
+  if (typeof v === 'number') {
+    if (v < 1) return null
+    const d = new Date(Math.round((v - 25569) * 86400 * 1000))
+    return isNaN(d.getTime()) || d.getFullYear() > 2100 || d.getFullYear() < 1900 ? null : d
+  }
+  const s = String(v).trim()
+  if (!s || s === '0' || s === '00:00:00') return null
+  const d = new Date(s)
+  if (isNaN(d.getTime()) || d.getFullYear() > 2100 || d.getFullYear() < 1900) return null
+  return d
+}
 
 async function main() {
-  const wb = XLSX.readFile(FILE)
+  const wb = XLSX.readFile(FILE, { cellDates: true })
 
   // 1. Seed companies
   const companies = await Promise.all([
@@ -13,6 +39,7 @@ async function main() {
     prisma.company.upsert({ where: { rut: '76000003-3' }, update: {}, create: { name: 'Transversales', rut: '76000003-3', type: 'TRANSVERSAL', splitRatio: 0.5 } }),
   ])
   const companyMap = new Map(companies.map(c => [c.name.toLowerCase().slice(0, 3), c.id]))
+  console.log('Empresas: OK')
 
   // 2. Seed centros de costo
   const sheetCeco = wb.Sheets['Centros de Costos']
@@ -56,39 +83,48 @@ async function main() {
     console.log('Cuentas y categorías: OK')
   }
 
-  // 4. Migrate BD transactions
+  // Pre-load lookups into Maps to avoid N+1 queries
+  const [allCecos, allAccounts] = await Promise.all([
+    prisma.costCenter.findMany({ select: { id: true, code: true } }),
+    prisma.account.findMany({ select: { id: true, code: true } }),
+  ])
+  const cecoById = new Map(allCecos.map(c => [c.code, c.id]))
+  const accountById = new Map(allAccounts.map(a => [a.code, a.id]))
+
+  // 4. Migrate BD transactions (batch insert)
   const sheetBD = wb.Sheets['BD']
   if (!sheetBD) { console.error('Hoja BD no encontrada'); return }
   const bdRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheetBD)
-  console.log(`Migrando ${bdRows.length} transacciones…`)
+  console.log(`Migrando ${bdRows.length} transacciones en batches de ${BATCH}…`)
 
-  const parseDate = (v: unknown): Date | null => {
-    if (!v) return null
-    if (v instanceof Date) return isNaN(v.getTime()) ? null : v
-    const s = String(v).trim()
-    if (!s || s === '0' || s === '00:00:00') return null
-    const d = new Date(s)
-    return isNaN(d.getTime()) ? null : d
+  const batch: Prisma.TransactionCreateManyInput[] = []
+  let ok = 0, skipped = 0
+
+  const flush = async () => {
+    if (batch.length === 0) return
+    await prisma.transaction.createMany({ data: batch, skipDuplicates: true })
+    ok += batch.length
+    batch.length = 0
+    console.log(`  ${ok}/${bdRows.length}…`)
   }
 
-  let ok = 0, skipped = 0
   for (const row of bdRows) {
     try {
       const empresa = String(row['Empresa'] ?? '').trim().toLowerCase().slice(0, 3)
       const companyId = companyMap.get(empresa) ?? companies[0].id
 
       const cecoCode = String(row['Código ceco'] ?? row['Codigo ceco'] ?? '').trim()
-      const costCenter = cecoCode ? await prisma.costCenter.findUnique({ where: { code: cecoCode } }) : null
+      const costCenterId = cecoCode ? (cecoById.get(cecoCode) ?? null) : null
 
       const ctaCode = String(row['Código cta'] ?? row['Codigo cta'] ?? '').trim()
-      const account = ctaCode ? await prisma.account.findUnique({ where: { code: ctaCode } }) : null
+      const accountId = ctaCode ? (accountById.get(ctaCode) ?? null) : null
 
       const mvRaw = String(row['Movimiento'] ?? '').toLowerCase()
       const movementType = mvRaw.includes('ingreso') ? 'INGRESO' : 'EGRESO'
 
       const net = parseFloat(String(row['Neto'] ?? '0').replace(/[^0-9.-]/g, '')) || 0
       const tax = parseFloat(String(row['Impuesto'] ?? '0').replace(/[^0-9.-]/g, '')) || 0
-      const gross = parseFloat(String(row['Bruto'] ?? String(net + tax)).replace(/[^0-9.-]/g, '')) || net + tax
+      const gross = parseFloat(String(row['Bruto'] ?? '').replace(/[^0-9.-]/g, '')) || net + tax
 
       const statusRaw = String(row['Estado'] ?? '').toLowerCase()
       const status = statusRaw.includes('pagado') ? 'PAGADO' : statusRaw.includes('nulo') ? 'NULO' : 'PENDIENTE'
@@ -99,38 +135,42 @@ async function main() {
         : bankRaw.includes('Itaú') || bankRaw.includes('Itau') ? 'ITAU'
         : bankRaw.includes('Santander') ? 'SANTANDER' : null
 
-      await prisma.transaction.create({
-        data: {
-          companyId,
-          costCenterId: costCenter?.id ?? null,
-          accountId: account?.id ?? null,
-          movementType: movementType as 'INGRESO' | 'EGRESO',
-          description: String(row['Descripción'] ?? row['Descripcion'] ?? '').trim() || '(sin descripción)',
-          quantity: parseFloat(String(row['Cantidad'] ?? '').replace(/[^0-9.-]/g, '')) || null,
-          unitValue: parseFloat(String(row['Valor x UM'] ?? '').replace(/[^0-9.-]/g, '')) || null,
-          net,
-          tax,
-          gross,
-          paymentDate: parseDate(row['Fecha de pago']),
-          status: status as 'PAGADO' | 'PENDIENTE' | 'NULO',
-          paymentMethod: String(row['Modalidad de pago'] ?? '').includes('Transfer') ? 'TRANSFERENCIA'
-            : String(row['Modalidad de pago'] ?? '').includes('Cheque') ? 'CHEQUE' : null,
-          bank: bank as 'CHILE' | 'BCI' | 'ITAU' | 'SANTANDER' | null,
-          docIssueDate: parseDate(row['Fecha emisión doc']),
-          docDueDate: parseDate(row['Fecha venc. fact']),
-          boletaNum: String(row['Boleta'] ?? '').trim() || null,
-          facturaNum: String(row['Factura'] ?? '').trim() || null,
-          gdNumber: String(row['GD N°'] ?? '').trim() || null,
-          rendicionNum: String(row['Rendición N°'] ?? '').trim() || null,
-        },
+      const pmRaw = String(row['Modalidad de pago'] ?? '')
+      const paymentMethod = pmRaw.includes('Transfer') ? 'TRANSFERENCIA'
+        : pmRaw.includes('Cheque') ? 'CHEQUE'
+        : pmRaw.includes('Tarjeta') || pmRaw.includes('tarjeta') ? 'TARJETA_CREDITO' : null
+
+      batch.push({
+        companyId,
+        costCenterId,
+        accountId,
+        movementType: movementType as 'INGRESO' | 'EGRESO',
+        description: String(row['Descripción'] ?? row['Descripcion'] ?? '').trim() || '(sin descripción)',
+        quantity: parseFloat(String(row['Cantidad'] ?? '').replace(/[^0-9.-]/g, '')) || null,
+        unitValue: parseFloat(String(row['Valor x UM'] ?? '').replace(/[^0-9.-]/g, '')) || null,
+        net,
+        tax,
+        gross,
+        paymentDate: parseDate(row['Fecha de pago']),
+        status: status as 'PAGADO' | 'PENDIENTE' | 'NULO',
+        paymentMethod: paymentMethod as 'TRANSFERENCIA' | 'CHEQUE' | 'TARJETA_CREDITO' | null,
+        bank: bank as 'CHILE' | 'BCI' | 'ITAU' | 'SANTANDER' | null,
+        docIssueDate: parseDate(row['Fecha emisión doc']),
+        docDueDate: parseDate(row['Fecha venc. fact']),
+        boletaNum: String(row['Boleta'] ?? '').trim() || null,
+        facturaNum: String(row['Factura'] ?? '').trim() || null,
+        gdNumber: String(row['GD N°'] ?? '').trim() || null,
+        rendicionNum: String(row['Rendición N°'] ?? '').trim() || null,
       })
-      ok++
-      if (ok % 500 === 0) console.log(`  ${ok}/${bdRows.length}…`)
+
+      if (batch.length >= BATCH) await flush()
     } catch (e) {
       skipped++
-      if (skipped <= 5) console.error('Skip:', (e as Error).message)
+      if (skipped <= 3) console.error('Skip:', (e as Error).message.slice(0, 120))
     }
   }
+
+  await flush()
   console.log(`\nListo: ${ok} insertadas, ${skipped} omitidas`)
 }
 
