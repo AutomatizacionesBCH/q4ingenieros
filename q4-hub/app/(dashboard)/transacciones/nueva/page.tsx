@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { TransaccionForm } from '@/components/transacciones/TransaccionForm'
 
 export default async function NuevaTransaccionPage() {
-  const [companies, cecos, accounts, providers] = await Promise.all([
+  const [companies, cecos, accounts, providers, pos] = await Promise.all([
     prisma.company.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
     prisma.costCenter.findMany({ select: { id: true, code: true, name: true, companyId: true }, orderBy: { code: 'asc' } }),
     prisma.account.findMany({
@@ -13,6 +13,11 @@ export default async function NuevaTransaccionPage() {
       orderBy: { code: 'asc' },
     }),
     prisma.provider.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    prisma.purchaseOrder.findMany({
+      where: { status: 'ACTIVA' },
+      select: { id: true, description: true, companyId: true, providerId: true },
+      orderBy: { id: 'desc' },
+    }),
   ])
 
   return (
@@ -32,6 +37,12 @@ export default async function NuevaTransaccionPage() {
         cecos={cecos.map(c => ({ id: c.id, label: `${c.code} · ${c.name}`, companyId: c.companyId }))}
         accounts={accounts}
         providers={providers.map(p => ({ id: p.id, label: p.name }))}
+        purchaseOrders={pos.map(p => ({
+          id: p.id,
+          label: `OC-${String(p.id).padStart(4, '0')} · ${p.description.slice(0, 60)}`,
+          companyId: p.companyId,
+          providerId: p.providerId,
+        }))}
       />
     </div>
   )

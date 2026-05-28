@@ -11,6 +11,7 @@ export type TransaccionFormValues = {
   accountId?: number | null
   categoryId?: number | null
   providerId?: number | null
+  purchaseOrderId?: number | null
   movementType?: 'INGRESO' | 'EGRESO'
   description?: string
   quantity?: string
@@ -32,12 +33,15 @@ export type TransaccionFormValues = {
   notes?: string
 }
 
+type POOption = { id: number; label: string; companyId: number; providerId: number | null }
+
 type Props = {
   initial?: TransaccionFormValues
   companies: Option[]
   cecos: (Option & { companyId: number })[]
   accounts: Account[]
   providers: Option[]
+  purchaseOrders?: POOption[]
   mode: 'create' | 'edit'
   id?: number
 }
@@ -82,7 +86,7 @@ function Field({ label, children, span = 1 }: { label: string; children: React.R
   )
 }
 
-export function TransaccionForm({ initial, companies, cecos, accounts, providers, mode, id }: Props) {
+export function TransaccionForm({ initial, companies, cecos, accounts, providers, purchaseOrders = [], mode, id }: Props) {
   const router = useRouter()
   const [v, setV] = useState<TransaccionFormValues>({
     movementType: 'EGRESO',
@@ -105,6 +109,10 @@ export function TransaccionForm({ initial, companies, cecos, accounts, providers
   const categoriesForAccount = useMemo(
     () => accounts.find(a => a.id === v.accountId)?.categories ?? [],
     [v.accountId, accounts]
+  )
+  const filteredPOs = useMemo(
+    () => v.companyId ? purchaseOrders.filter(p => p.companyId === v.companyId) : purchaseOrders,
+    [v.companyId, purchaseOrders]
   )
 
   const set = <K extends keyof TransaccionFormValues>(k: K, value: TransaccionFormValues[K]) => {
@@ -227,6 +235,14 @@ export function TransaccionForm({ initial, companies, cecos, accounts, providers
               onChange={e => set('categoryId', e.target.value ? Number(e.target.value) : null)}>
               <option value="">— Sin categoría —</option>
               {categoriesForAccount.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </Field>
+
+          <Field label="Orden de compra" span={4}>
+            <select style={inputStyle} value={v.purchaseOrderId ?? ''}
+              onChange={e => set('purchaseOrderId', e.target.value ? Number(e.target.value) : null)}>
+              <option value="">— Sin OC —</option>
+              {filteredPOs.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
             </select>
           </Field>
         </div>

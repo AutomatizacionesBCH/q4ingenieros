@@ -19,7 +19,7 @@ export default async function EditarTransaccionPage({
   const txId = Number(id)
   if (!Number.isFinite(txId)) notFound()
 
-  const [tx, companies, cecos, accounts, providers] = await Promise.all([
+  const [tx, companies, cecos, accounts, providers, pos] = await Promise.all([
     prisma.transaction.findUnique({ where: { id: txId } }),
     prisma.company.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
     prisma.costCenter.findMany({ select: { id: true, code: true, name: true, companyId: true }, orderBy: { code: 'asc' } }),
@@ -28,6 +28,10 @@ export default async function EditarTransaccionPage({
       orderBy: { code: 'asc' },
     }),
     prisma.provider.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    prisma.purchaseOrder.findMany({
+      select: { id: true, description: true, companyId: true, providerId: true, status: true },
+      orderBy: { id: 'desc' },
+    }),
   ])
 
   if (!tx) notFound()
@@ -52,6 +56,7 @@ export default async function EditarTransaccionPage({
           accountId: tx.accountId,
           categoryId: tx.categoryId,
           providerId: tx.providerId,
+          purchaseOrderId: tx.purchaseOrderId,
           movementType: tx.movementType,
           description: tx.description,
           quantity: tx.quantity?.toString() ?? '',
@@ -76,6 +81,14 @@ export default async function EditarTransaccionPage({
         cecos={cecos.map(c => ({ id: c.id, label: `${c.code} · ${c.name}`, companyId: c.companyId }))}
         accounts={accounts}
         providers={providers.map(p => ({ id: p.id, label: p.name }))}
+        purchaseOrders={pos
+          .filter(p => p.status === 'ACTIVA' || p.id === tx.purchaseOrderId)
+          .map(p => ({
+            id: p.id,
+            label: `OC-${String(p.id).padStart(4, '0')}${p.status !== 'ACTIVA' ? ` [${p.status}]` : ''} · ${p.description.slice(0, 60)}`,
+            companyId: p.companyId,
+            providerId: p.providerId,
+          }))}
       />
     </div>
   )
