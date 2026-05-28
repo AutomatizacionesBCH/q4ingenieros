@@ -22,6 +22,8 @@ const MODULES = [
   { href: '/bancos',              label: 'Bancos',              short: 'Bancos',  icon: '◰' },
   { href: '/reportes',            label: 'Reportes',            short: 'EE.RR',   icon: '◱' },
   { href: '/centros-costo',       label: 'Centros de Costo',    short: 'CeCo',    icon: '◲' },
+  { href: '/proveedores',         label: 'Proveedores',         short: 'Prov.',   icon: '◳' },
+  { href: '/plan-cuentas',        label: 'Plan de Cuentas',     short: 'Plan',    icon: '◴' },
 ]
 
 export function Sidebar() {
