@@ -1,0 +1,236 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum CompanyType {
+  PRINCIPAL
+  TRANSVERSAL
+}
+
+enum MovementType {
+  INGRESO
+  EGRESO
+}
+
+enum TxStatus {
+  PAGADO
+  PENDIENTE
+  NULO
+}
+
+enum PaymentMethod {
+  TRANSFERENCIA
+  CHEQUE
+  TARJETA_CREDITO
+}
+
+enum Bank {
+  CHILE
+  BCI
+  ITAU
+  SANTANDER
+}
+
+enum Currency {
+  CLP
+  UF
+}
+
+enum POStatus {
+  ACTIVA
+  CERRADA
+  CANCELADA
+}
+
+enum ProposalStatus {
+  BORRADOR
+  ENVIADA
+  ACEPTADA
+}
+
+enum BalanceType {
+  CONTABLE
+  LINEA_CREDITO
+}
+
+enum UserRole {
+  ADMIN
+  FINANZAS
+  PROYECTOS
+  OBRAS
+}
+
+model Company {
+  id             Int             @id @default(autoincrement())
+  name           String
+  rut            String          @unique
+  type           CompanyType     @default(PRINCIPAL)
+  splitRatio     Decimal         @default(1.0) @db.Decimal(4, 2)
+  costCenters    CostCenter[]
+  transactions   Transaction[]
+  issuedInvoices IssuedInvoice[]
+  bankBalances   BankBalance[]
+  users          User[]
+  createdAt      DateTime        @default(now())
+}
+
+model CostCenter {
+  id               Int               @id @default(autoincrement())
+  code             String            @unique
+  name             String
+  companyId        Int
+  company          Company           @relation(fields: [companyId], references: [id])
+  projectNumber    String?
+  location         String?
+  transactions     Transaction[]
+  purchaseOrders   PurchaseOrder[]
+  issuedInvoices   IssuedInvoice[]
+  closingProposals ClosingProposal[]
+  createdAt        DateTime          @default(now())
+
+  @@index([companyId])
+}
+
+model Account {
+  id           Int           @id @default(autoincrement())
+  code         String        @unique
+  name         String
+  movementType MovementType
+  categories   Category[]
+  transactions Transaction[]
+}
+
+model Category {
+  id           Int           @id @default(autoincrement())
+  name         String
+  accountId    Int
+  account      Account       @relation(fields: [accountId], references: [id])
+  transactions Transaction[]
+}
+
+model Provider {
+  id               Int               @id @default(autoincrement())
+  name             String
+  rut              String            @unique
+  email            String?
+  phone            String?
+  transactions     Transaction[]
+  purchaseOrders   PurchaseOrder[]
+  closingProposals ClosingProposal[]
+  createdAt        DateTime          @default(now())
+}
+
+model Transaction {
+  id              Int            @id @default(autoincrement())
+  companyId       Int
+  company         Company        @relation(fields: [companyId], references: [id])
+  costCenterId    Int?
+  costCenter      CostCenter?    @relation(fields: [costCenterId], references: [id])
+  accountId       Int?
+  account         Account?       @relation(fields: [accountId], references: [id])
+  categoryId      Int?
+  category        Category?      @relation(fields: [categoryId], references: [id])
+  providerId      Int?
+  provider        Provider?      @relation(fields: [providerId], references: [id])
+  purchaseOrderId Int?
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  movementType    MovementType
+  description     String
+  quantity        Decimal?       @db.Decimal(14, 4)
+  unitValue       Decimal?       @db.Decimal(14, 2)
+  net             Decimal        @db.Decimal(14, 2)
+  tax             Decimal        @default(0) @db.Decimal(14, 2)
+  gross           Decimal        @db.Decimal(14, 2)
+  paymentDate     DateTime?      @db.Date
+  status          TxStatus       @default(PENDIENTE)
+  paymentMethod   PaymentMethod?
+  bank            Bank?
+  docIssueDate    DateTime?      @db.Date
+  docDueDate      DateTime?      @db.Date
+  gdNumber        String?
+  rendicionNum    String?
+  boletaNum       String?
+  facturaNum      String?
+  currency        Currency       @default(CLP)
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([companyId])
+  @@index([costCenterId])
+  @@index([paymentDate])
+  @@index([status])
+}
+
+model PurchaseOrder {
+  id           Int           @id @default(autoincrement())
+  companyId    Int
+  costCenterId Int?
+  costCenter   CostCenter?   @relation(fields: [costCenterId], references: [id])
+  providerId   Int?
+  provider     Provider?     @relation(fields: [providerId], references: [id])
+  description  String
+  total        Decimal       @db.Decimal(14, 2)
+  status       POStatus      @default(ACTIVA)
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
+}
+
+model IssuedInvoice {
+  id                Int         @id @default(autoincrement())
+  companyId         Int
+  company           Company     @relation(fields: [companyId], references: [id])
+  costCenterId      Int?
+  costCenter        CostCenter? @relation(fields: [costCenterId], references: [id])
+  epNumber          String?
+  invoiceNumber     String?
+  amount            Decimal     @db.Decimal(14, 2)
+  received          Decimal     @default(0) @db.Decimal(14, 2)
+  paymentDate       DateTime?   @db.Date
+  issueDate         DateTime?   @db.Date
+  status            TxStatus    @default(PENDIENTE)
+  factoring         Boolean     @default(false)
+  factoringInterest Decimal?    @db.Decimal(6, 4)
+  factoringDueDate  DateTime?   @db.Date
+  entity            String?
+  createdAt         DateTime    @default(now())
+}
+
+model ClosingProposal {
+  id           Int            @id @default(autoincrement())
+  costCenterId Int?
+  costCenter   CostCenter?    @relation(fields: [costCenterId], references: [id])
+  providerId   Int?
+  provider     Provider?      @relation(fields: [providerId], references: [id])
+  description  String
+  content      Json           @default("{}")
+  pdfUrl       String?
+  status       ProposalStatus @default(BORRADOR)
+  createdAt    DateTime       @default(now())
+}
+
+model BankBalance {
+  id         Int         @id @default(autoincrement())
+  bank       Bank
+  companyId  Int
+  company    Company     @relation(fields: [companyId], references: [id])
+  balance    Decimal     @db.Decimal(14, 2)
+  type       BalanceType @default(CONTABLE)
+  recordedAt DateTime    @default(now())
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  role      UserRole @default(FINANZAS)
+  companyId Int?
+  company   Company? @relation(fields: [companyId], references: [id])
+  createdAt DateTime @default(now())
+}
