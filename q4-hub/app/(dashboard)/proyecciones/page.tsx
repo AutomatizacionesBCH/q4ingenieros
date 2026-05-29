@@ -1,14 +1,22 @@
 export const dynamic = 'force-dynamic'
 
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { formatCLP, formatDate, bestDate } from '@/lib/fmt'
-import { T, STATUS_COLOR } from '@/lib/theme'
+import { T } from '@/lib/theme'
 import { StatusBadge } from '@/components/transacciones/StatusBadge'
 import { ProyeccionesFilters } from '@/components/proyecciones/ProyeccionesFilters'
 import { Pagination } from '@/components/Pagination'
-import { getCompanies, getCecos, getAccounts } from '@/lib/maestros-cache'
+import { ExportButtons } from '@/components/ExportButtons'
+import { EditableCell } from '@/components/inline/EditableCell'
+import { CecoAutocomplete } from '@/components/inline/CecoAutocomplete'
+import { ProveedorAutocomplete } from '@/components/inline/ProveedorAutocomplete'
+import { TableSkeleton } from '@/components/Skeleton'
+import { getCompanies, getCecos, getAccounts, getProviders } from '@/lib/maestros-cache'
 import type { Prisma } from '@prisma/client'
+
+type SP = Record<string, string | undefined>
 
 function getWeekRange() {
   const now = new Date()
@@ -22,39 +30,32 @@ function getWeekRange() {
   return { monday, friday }
 }
 
-export default async function ProyeccionesPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | undefined>>
-}) {
-  const sp = await searchParams
+function buildWhere(sp: SP): Prisma.TransactionWhereInput {
   const { monday, friday } = getWeekRange()
-  const page = Math.max(1, parseInt(sp.page ?? '1'))
-  const limit = 100
-
   const from = sp.from ? new Date(sp.from + 'T00:00:00') : monday
   const to = sp.to ? new Date(sp.to + 'T23:59:59') : friday
-  const status = sp.status as 'PAGADO' | 'PENDIENTE' | 'NULO' | undefined
-  const companyId = sp.companyId ? Number(sp.companyId) : undefined
-  const costCenterId = sp.costCenterId ? Number(sp.costCenterId) : undefined
-  const accountId = sp.accountId ? Number(sp.accountId) : undefined
-
-  const where: Prisma.TransactionWhereInput = {
+  return {
     movementType: 'EGRESO',
     paymentDate: { gte: from, lte: to },
-    ...(status ? { status } : {}),
-    ...(companyId ? { companyId } : {}),
-    ...(costCenterId ? { costCenterId } : {}),
-    ...(accountId ? { accountId } : {}),
+    ...(sp.status ? { status: sp.status as 'PAGADO' | 'PENDIENTE' | 'NULO' } : {}),
+    ...(sp.companyId ? { companyId: Number(sp.companyId) } : {}),
+    ...(sp.costCenterId ? { costCenterId: Number(sp.costCenterId) } : {}),
+    ...(sp.accountId ? { accountId: Number(sp.accountId) } : {}),
   }
+}
 
-  const [total, pagos, companies, cecos, accounts, totalsByStatus] = await Promise.all([
+async function TablaProyecciones({ sp }: { sp: SP }) {
+  const page = Math.max(1, parseInt(sp.page ?? '1'))
+  const limit = 100
+  const where = buildWhere(sp)
+
+  const [total, pagos, cecos, providers, totalsByStatus] = await Promise.all([
     prisma.transaction.count({ where }),
     prisma.transaction.findMany({
       where, skip: (page - 1) * limit, take: limit,
       select: {
         id: true, description: true, paymentDate: true, docDueDate: true, docIssueDate: true,
-        createdAt: true, gross: true, status: true,
+        createdAt: true, gross: true, status: true, costCenterId: true, providerId: true,
         costCenter: { select: { code: true, name: true } },
         provider: { select: { name: true } },
         company: { select: { name: true } },
@@ -62,38 +63,24 @@ export default async function ProyeccionesPage({
       },
       orderBy: [{ paymentDate: { sort: 'asc', nulls: 'last' } }, { gross: 'desc' }],
     }),
-    getCompanies(), getCecos(), getAccounts(),
+    getCecos(),
+    getProviders(),
     prisma.transaction.groupBy({
       by: ['status'], where, _sum: { gross: true }, _count: { _all: true },
     }),
   ])
 
-  const totalGeneral = pagos.reduce((s, t) => s + Number(t.gross), 0)
   const pendiente = totalsByStatus.find(x => x.status === 'PENDIENTE')
   const pagado = totalsByStatus.find(x => x.status === 'PAGADO')
   const nulo = totalsByStatus.find(x => x.status === 'NULO')
-  const accountsEgreso = accounts.filter(a => a.movementType === 'EGRESO')
+  const totalGeneral = pagos.reduce((s, t) => s + Number(t.gross), 0)
 
   return (
-    <div style={{ padding: 28 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
-        <div>
-          <h1 style={{ color: T.textPrimary, fontSize: 22, fontWeight: 700, margin: 0 }}>Proyecciones</h1>
-          <div style={{ color: T.textSec, fontSize: 13, marginTop: 4 }}>
-            Rango: {formatDate(from)} → {formatDate(to)} · {total} egresos
-          </div>
-        </div>
-        <Link href={`/transacciones/nueva?movementType=EGRESO`} style={{
-          background: T.orange, color: '#fff', borderRadius: 8,
-          padding: '9px 18px', fontSize: 13, fontWeight: 600, textDecoration: 'none',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-        }}>+ Nuevo egreso</Link>
-      </div>
-
+    <>
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 18 }}>
         {[
-          { label: 'Total rango', value: Number(pagos.reduce((s, t) => s + Number(t.gross), 0)), count: total, color: T.textPrimary },
+          { label: 'Total página', value: totalGeneral, count: pagos.length, color: T.textPrimary },
           { label: 'Pendiente', value: Number(pendiente?._sum.gross ?? 0), count: pendiente?._count._all ?? 0, color: T.warning },
           { label: 'Pagado', value: Number(pagado?._sum.gross ?? 0), count: pagado?._count._all ?? 0, color: T.success },
           { label: 'Nulo', value: Number(nulo?._sum.gross ?? 0), count: nulo?._count._all ?? 0, color: T.textMuted },
@@ -112,12 +99,6 @@ export default async function ProyeccionesPage({
         ))}
       </div>
 
-      <ProyeccionesFilters
-        companies={companies.map(c => ({ id: c.id, label: c.name }))}
-        cecos={cecos.map(c => ({ id: c.id, label: `${c.code} · ${c.name}` }))}
-        accounts={accountsEgreso.map(a => ({ id: a.id, label: `${a.code} · ${a.name}` }))}
-      />
-
       <div style={{
         background: T.card, borderRadius: 12, border: `1px solid ${T.border}`, overflow: 'auto',
         boxShadow: '0 1px 2px rgba(15,26,46,0.04)',
@@ -127,7 +108,7 @@ export default async function ProyeccionesPage({
             <tr style={{ borderBottom: `1px solid ${T.border}`, background: T.cardHover }}>
               {['Fecha', 'Empresa', 'CeCo', 'Descripción', 'Proveedor', 'Cuenta', 'Bruto', 'Estado'].map(h => (
                 <th key={h} style={{
-                  padding: '12px 14px', textAlign: h === 'Bruto' ? 'right' : 'left',
+                  padding: '10px 8px', textAlign: h === 'Bruto' ? 'right' : 'left',
                   color: T.textMuted, fontSize: 10, fontWeight: 700,
                   letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap',
                 }}>{h}</th>
@@ -137,44 +118,73 @@ export default async function ProyeccionesPage({
           <tbody>
             {pagos.map((tx, i) => {
               const best = bestDate(tx)
+              const paymentDateStr = tx.paymentDate ? tx.paymentDate.toISOString().slice(0, 10) : ''
               return (
                 <tr key={tx.id} style={{
                   borderBottom: `1px solid ${T.border}`,
                   background: i % 2 === 0 ? T.card : T.cardHover,
                 }}>
-                  <td style={{ padding: '10px 14px', fontSize: 12, whiteSpace: 'nowrap' }}>
-                    <Link href={`/transacciones/${tx.id}/editar`} style={{ color: T.orange, textDecoration: 'none', fontWeight: 600 }}>
-                      {best ? formatDate(best.date) : '—'}
-                      {best && best.kind !== 'pago' && (
-                        <span style={{ color: T.textMuted, fontSize: 9, marginLeft: 4, fontWeight: 500 }}>
-                          ({best.kind})
-                        </span>
-                      )}
-                    </Link>
+                  <td style={{ padding: '2px 4px', fontSize: 12, whiteSpace: 'nowrap' }}>
+                    <EditableCell txId={tx.id} field="paymentDate" kind="date"
+                      value={paymentDateStr}
+                      display={
+                        best ? (
+                          <span style={{ color: T.orange, fontWeight: 600 }}>
+                            {formatDate(best.date)}
+                            {best.kind !== 'pago' && (
+                              <span style={{ color: T.textMuted, fontSize: 9, marginLeft: 4, fontWeight: 500 }}>
+                                ({best.kind})
+                              </span>
+                            )}
+                          </span>
+                        ) : null
+                      }
+                    />
                   </td>
-                  <td style={{ padding: '10px 14px', color: T.textSec, fontSize: 12, whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '6px 10px', color: T.textSec, fontSize: 12, whiteSpace: 'nowrap' }}>
                     {tx.company.name.split(' ')[0]}
                   </td>
-                  <td style={{ padding: '10px 14px', color: T.orange, fontSize: 12, fontFamily: 'monospace', whiteSpace: 'nowrap' }}
-                    title={tx.costCenter?.name ?? ''}>
-                    {tx.costCenter?.code ?? '—'}
+                  <td style={{ padding: '2px 4px' }}>
+                    <CecoAutocomplete txId={tx.id}
+                      currentCode={tx.costCenter?.code ?? null}
+                      currentId={tx.costCenterId ?? null}
+                      cecos={cecos.map(c => ({ id: c.id, code: c.code, name: c.name }))} />
                   </td>
-                  <td style={{ padding: '10px 14px', color: T.textPrimary, fontSize: 13, maxWidth: 320,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tx.description}>
-                    {tx.description}
+                  <td style={{ padding: '2px 4px', maxWidth: 340 }}>
+                    <EditableCell txId={tx.id} field="description" kind="text"
+                      value={tx.description}
+                      display={
+                        <span style={{
+                          color: T.textPrimary, fontSize: 13,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          display: 'block',
+                        }} title={tx.description}>
+                          {tx.description}
+                        </span>
+                      }
+                    />
                   </td>
-                  <td style={{ padding: '10px 14px', color: T.textSec, fontSize: 12, maxWidth: 180,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tx.provider?.name ?? ''}>
-                    {tx.provider?.name ?? '—'}
+                  <td style={{ padding: '2px 4px', maxWidth: 180 }}>
+                    <ProveedorAutocomplete txId={tx.id}
+                      currentName={tx.provider?.name ?? null}
+                      currentId={tx.providerId ?? null}
+                      providers={providers.map(p => ({ id: p.id, name: p.name }))} />
                   </td>
-                  <td style={{ padding: '10px 14px', color: T.textMuted, fontSize: 12, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '6px 10px', color: T.textMuted, fontSize: 12, fontFamily: 'monospace' }}>
                     {tx.account?.code ?? '—'}
                   </td>
-                  <td style={{ padding: '10px 14px', color: T.textPrimary, fontSize: 13,
-                    textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
-                    {formatCLP(Number(tx.gross))}
+                  <td style={{ padding: '2px 4px', textAlign: 'right' }}>
+                    <EditableCell txId={tx.id} field="gross" kind="money"
+                      value={Number(tx.gross)}
+                      align="right" fontWeight={600}
+                      display={
+                        <span style={{ color: T.textPrimary, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                          {formatCLP(Number(tx.gross))}
+                        </span>
+                      }
+                    />
                   </td>
-                  <td style={{ padding: '10px 14px' }}>
+                  <td style={{ padding: '6px 10px' }}>
                     <StatusBadge txId={tx.id} status={tx.status} />
                   </td>
                 </tr>
@@ -188,19 +198,64 @@ export default async function ProyeccionesPage({
               </tr>
             )}
           </tbody>
-          <tfoot>
-            <tr style={{ borderTop: `2px solid ${T.border}`, background: T.orangeFaint }}>
-              <td colSpan={6} style={{ padding: '12px 14px', color: T.textSec, fontSize: 12, fontWeight: 700 }}>TOTAL PÁGINA</td>
-              <td style={{ padding: '12px 14px', color: T.orange, fontSize: 15,
-                textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>
-                {formatCLP(totalGeneral)}
-              </td>
-              <td />
-            </tr>
-          </tfoot>
         </table>
       </div>
       <Pagination total={total} page={page} limit={limit} />
+    </>
+  )
+}
+
+async function FiltrosWrapper() {
+  const [companies, cecos, accounts] = await Promise.all([
+    getCompanies(), getCecos(), getAccounts(),
+  ])
+  const accountsEgreso = accounts.filter(a => a.movementType === 'EGRESO')
+  return (
+    <ProyeccionesFilters
+      companies={companies.map(c => ({ id: c.id, label: c.name }))}
+      cecos={cecos.map(c => ({ id: c.id, label: `${c.code} · ${c.name}` }))}
+      accounts={accountsEgreso.map(a => ({ id: a.id, label: `${a.code} · ${a.name}` }))}
+    />
+  )
+}
+
+export default async function ProyeccionesPage({
+  searchParams,
+}: {
+  searchParams: Promise<SP>
+}) {
+  const sp = await searchParams
+  const { monday, friday } = getWeekRange()
+  const from = sp.from ? new Date(sp.from + 'T00:00:00') : monday
+  const to = sp.to ? new Date(sp.to + 'T23:59:59') : friday
+
+  return (
+    <div style={{ padding: 28 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+        <div>
+          <h1 style={{ color: T.textPrimary, fontSize: 22, fontWeight: 700, margin: 0 }}>Proyecciones</h1>
+          <div style={{ color: T.textSec, fontSize: 13, marginTop: 4 }}>
+            Rango: {formatDate(from)} → {formatDate(to)} · Click en cualquier celda para editar
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <ExportButtons tipo="proyecciones" />
+          <Link href={`/transacciones/nueva?movementType=EGRESO`} style={{
+            background: T.orange, color: '#fff', borderRadius: 8,
+            padding: '7px 16px', fontSize: 13, fontWeight: 600, textDecoration: 'none',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+          }}>+ Nuevo egreso</Link>
+        </div>
+      </div>
+
+      <Suspense fallback={<div style={{ height: 75, background: T.card, borderRadius: 12,
+        border: `1px solid ${T.border}`, marginBottom: 14 }} />}>
+        <FiltrosWrapper />
+      </Suspense>
+
+      <Suspense fallback={<TableSkeleton rows={12} />}>
+        <TablaProyecciones sp={sp} />
+      </Suspense>
     </div>
   )
 }
