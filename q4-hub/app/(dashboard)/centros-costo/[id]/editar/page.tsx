@@ -22,12 +22,12 @@ export default async function EditarCeCoPage({
   if (!ceco) notFound()
 
   return (
-    <div style={{ padding: 32, maxWidth: 1100 }}>
+    <div className="q4-page" style={{ padding: 32, maxWidth: 1100 }}>
       <div style={{ marginBottom: 24 }}>
         <Link href="/centros-costo" style={{ color: '#475569', fontSize: 12, textDecoration: 'none' }}>
           ← Centros de Costo
         </Link>
-        <h1 style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: '8px 0 0 0' }}>
+        <h1 className="q4-h1" style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: '8px 0 0 0' }}>
           Editar {ceco.code}
         </h1>
       </div>

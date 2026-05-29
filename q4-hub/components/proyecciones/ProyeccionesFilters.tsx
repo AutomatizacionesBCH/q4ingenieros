@@ -38,7 +38,7 @@ export function ProyeccionesFilters({ companies, cecos, accounts }: {
       padding: 16, marginBottom: 18, opacity: pending ? 0.7 : 1,
       boxShadow: '0 1px 2px rgba(15,26,46,0.04)',
     }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr) auto', gap: 12, alignItems: 'end' }}>
+      <div className="q4-filter-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr) auto', gap: 12, alignItems: 'end' }}>
         <div><label style={labelStyle}>Desde</label>
           <input type="date" style={inputStyle} value={get('from')} onChange={e => update('from', e.target.value)} /></div>
         <div><label style={labelStyle}>Hasta</label>

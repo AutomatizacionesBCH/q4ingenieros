@@ -11,12 +11,12 @@ export default async function NuevaFacturaPage() {
   ])
 
   return (
-    <div style={{ padding: 32, maxWidth: 1200 }}>
+    <div className="q4-page" style={{ padding: 32, maxWidth: 1200 }}>
       <div style={{ marginBottom: 24 }}>
         <Link href="/facturas-emitidas" style={{ color: '#475569', fontSize: 12, textDecoration: 'none' }}>
           ← Facturas Emitidas
         </Link>
-        <h1 style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: '8px 0 0 0' }}>
+        <h1 className="q4-h1" style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: '8px 0 0 0' }}>
           Nueva factura emitida
         </h1>
       </div>

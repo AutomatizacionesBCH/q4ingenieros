@@ -67,7 +67,7 @@ export function TransaccionesFilters({
       border: `1px solid ${T.border}`, padding: 14, marginBottom: 14,
       opacity: pending ? 0.7 : 1, boxShadow: '0 1px 2px rgba(15,26,46,0.04)',
     }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr repeat(6, 1fr) auto',
+      <div className="q4-filter-grid-7" style={{ display: 'grid', gridTemplateColumns: '2fr repeat(6, 1fr) auto',
         gap: 10, alignItems: 'end' }}>
         <div>
           <label style={labelStyle}>Buscar</label>

@@ -37,10 +37,10 @@ export default async function BancosPage() {
   const totalContable = Array.from(totalsByBank.values()).reduce((a, b) => a + b, 0)
 
   return (
-    <div style={{ padding: 32 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+    <div className="q4-page" style={{ padding: 32 }}>
+      <div className="q4-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: 0 }}>Bancos</h1>
+          <h1 className="q4-h1" style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: 0 }}>Bancos</h1>
           <div style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>
             Saldo contable total: <span style={{ color: '#16A34A', fontWeight: 700 }}>{formatCLP(totalContable)}</span>
           </div>

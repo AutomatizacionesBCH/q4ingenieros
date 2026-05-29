@@ -29,10 +29,10 @@ export default async function OrdenesCompraPage() {
   const activas = enriched.filter(o => o.status === 'ACTIVA').length
 
   return (
-    <div style={{ padding: 32 }}>
+    <div className="q4-page" style={{ padding: 32 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <h1 style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: 0 }}>Órdenes de Compra</h1>
+          <h1 className="q4-h1" style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: 0 }}>Órdenes de Compra</h1>
           <div style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>
             {enriched.length} OC · {activas} activas
           </div>
@@ -44,7 +44,7 @@ export default async function OrdenesCompraPage() {
       </div>
 
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
+      <div className="q4-kpi-grid q4-kpi-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
         {[
           { label: 'Total comprometido OC', value: totalOC, color: '#0F1A2E' },
           { label: 'Total pagado', value: totalPagado, color: '#16A34A' },

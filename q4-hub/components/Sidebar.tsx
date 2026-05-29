@@ -32,25 +32,28 @@ export function Sidebar() {
   const isMobile = useIsMobile()
 
   if (isMobile) {
-    const top5 = MODULES.slice(0, 5)
     return (
       <nav style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, height: 60,
+        position: 'fixed', bottom: 0, left: 0, right: 0, height: 64,
         background: C.bg, borderTop: `1px solid ${C.divider}`,
-        display: 'flex', zIndex: 200,
+        display: 'flex', overflowX: 'auto', overflowY: 'hidden',
+        zIndex: 200, WebkitOverflowScrolling: 'touch',
+        scrollbarWidth: 'none',
       }}>
-        {top5.map(mod => {
+        {MODULES.map(mod => {
           const active = pathname === mod.href || pathname.startsWith(mod.href + '/')
           return (
             <Link key={mod.href} href={mod.href} style={{
-              flex: 1, display: 'flex', flexDirection: 'column',
+              minWidth: 72, display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center', gap: 3,
-              textDecoration: 'none',
+              textDecoration: 'none', padding: '6px 10px',
               borderTop: `2px solid ${active ? C.border : 'transparent'}`,
               background: active ? C.active : 'transparent',
+              flexShrink: 0,
             }}>
-              <span style={{ fontSize: 20, opacity: active ? 1 : 0.45 }}>{mod.icon}</span>
-              <span style={{ fontSize: 9, fontWeight: active ? 700 : 400, color: active ? C.text : C.dim }}>
+              <span style={{ fontSize: 18, opacity: active ? 1 : 0.5 }}>{mod.icon}</span>
+              <span style={{ fontSize: 9, fontWeight: active ? 700 : 500,
+                color: active ? C.text : C.dim, whiteSpace: 'nowrap' }}>
                 {mod.short}
               </span>
             </Link>

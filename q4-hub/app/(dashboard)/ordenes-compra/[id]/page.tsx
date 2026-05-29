@@ -49,7 +49,7 @@ export default async function OCDetallePage({
   const pctPendiente = total > 0 ? Math.min(100 - pctPagado, (pendiente / total) * 100) : 0
 
   return (
-    <div style={{ padding: 32, maxWidth: 1280 }}>
+    <div className="q4-page" style={{ padding: 32, maxWidth: 1280 }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
@@ -57,7 +57,7 @@ export default async function OCDetallePage({
             ← Órdenes de Compra
           </Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 8 }}>
-            <h1 style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: 0,
+            <h1 className="q4-h1" style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: 0,
               fontFamily: 'monospace' }}>
               OC-{String(oc.id).padStart(4, '0')}
             </h1>
@@ -80,7 +80,7 @@ export default async function OCDetallePage({
       {/* Detalle */}
       <section style={{ background: '#FFFFFF', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
         padding: 24, marginBottom: 20 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20, marginBottom: 24 }}>
+        <div className="q4-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20, marginBottom: 24 }}>
           {[
             { label: 'Empresa', value: company?.name ?? '—' },
             { label: 'Centro de Costo', value: oc.costCenter ? `${oc.costCenter.code} · ${oc.costCenter.name}` : '—' },
@@ -103,7 +103,7 @@ export default async function OCDetallePage({
       {/* KPIs + Barra */}
       <section style={{ background: '#FFFFFF', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
         padding: 24, marginBottom: 20 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 18 }}>
+        <div className="q4-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 18 }}>
           {[
             { label: 'Total OC', value: total, color: '#0F1A2E' },
             { label: 'Pagado', value: pagado, color: '#16A34A' },

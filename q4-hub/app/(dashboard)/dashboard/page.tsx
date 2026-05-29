@@ -44,12 +44,12 @@ export default async function DashboardPage() {
   const totalPagadoMes = Number(pagado._sum.gross ?? 0)
 
   return (
-    <div style={{ padding: 28 }}>
-      <h1 style={{ color: T.textPrimary, fontSize: 22, fontWeight: 700, marginBottom: 24 }}>
+    <div className="q4-page" style={{ padding: 28 }}>
+      <h1 className="q4-h1" style={{ color: T.textPrimary, fontSize: 22, fontWeight: 700, marginBottom: 24 }}>
         Dashboard
       </h1>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
+      <div className="q4-kpi-grid q4-kpi-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
         {[
           { label: 'Pendiente por pagar', value: formatCLP(totalPendiente), color: T.warning },
           { label: 'Pagado este mes', value: formatCLP(totalPagadoMes), color: T.success },
@@ -72,7 +72,7 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 20 }}>
+      <div className="q4-dash-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 20 }}>
         <FlujoCajaChart />
         <PagosProximosWidget pagos={proximos.map(p => ({
           id: p.id, description: p.description,

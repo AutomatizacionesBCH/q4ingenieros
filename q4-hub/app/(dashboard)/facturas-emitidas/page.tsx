@@ -21,10 +21,10 @@ export default async function FacturasEmitidasPage() {
   const totalPendiente = totalMonto - totalRecibido
 
   return (
-    <div style={{ padding: 32 }}>
+    <div className="q4-page" style={{ padding: 32 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <h1 style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: 0 }}>Facturas Emitidas</h1>
+          <h1 className="q4-h1" style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: 0 }}>Facturas Emitidas</h1>
           <div style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>
             {facturas.length} facturas · Pendiente cobro: <span style={{ color: '#CA8A04', fontWeight: 700 }}>{formatCLP(totalPendiente)}</span>
           </div>
@@ -36,7 +36,7 @@ export default async function FacturasEmitidasPage() {
       </div>
 
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
+      <div className="q4-kpi-grid q4-kpi-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
         {[
           { label: 'Total facturado', value: formatCLP(totalMonto), color: '#0F1A2E' },
           { label: 'Total recibido', value: formatCLP(totalRecibido), color: '#16A34A' },

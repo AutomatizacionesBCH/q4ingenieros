@@ -25,9 +25,9 @@ export default async function ReportesPage() {
   })
 
   return (
-    <div style={{ padding: 28 }}>
+    <div className="q4-page" style={{ padding: 28 }}>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ color: T.textPrimary, fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Reportes</h1>
+        <h1 className="q4-h1" style={{ color: T.textPrimary, fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Reportes</h1>
         <div style={{ color: T.textSec, fontSize: 13 }}>Genera reportes en PDF o Excel con filtros</div>
       </div>
 

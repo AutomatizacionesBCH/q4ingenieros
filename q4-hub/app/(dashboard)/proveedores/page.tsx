@@ -13,10 +13,10 @@ export default async function ProveedoresPage() {
   })
 
   return (
-    <div style={{ padding: 32 }}>
+    <div className="q4-page" style={{ padding: 32 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h1 style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: 0 }}>Proveedores</h1>
+          <h1 className="q4-h1" style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: 0 }}>Proveedores</h1>
           <div style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>{providers.length} registrados</div>
         </div>
         <Link href="/proveedores/nuevo" style={{

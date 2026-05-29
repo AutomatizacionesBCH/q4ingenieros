@@ -38,10 +38,10 @@ export default async function PropuestasCierrePage() {
   const borradores = enriched.filter(p => p.status === 'BORRADOR').length
 
   return (
-    <div style={{ padding: 32 }}>
+    <div className="q4-page" style={{ padding: 32 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <h1 style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: 0 }}>Propuestas de Cierre</h1>
+          <h1 className="q4-h1" style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: 0 }}>Propuestas de Cierre</h1>
           <div style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>
             {enriched.length} propuestas · {borradores} borradores · {enviadas} enviadas · {aceptadas.length} aceptadas
           </div>
@@ -53,7 +53,7 @@ export default async function PropuestasCierrePage() {
       </div>
 
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
+      <div className="q4-kpi-grid q4-kpi-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
         {[
           { label: 'Total en propuestas', value: totalGeneral, color: '#0F1A2E' },
           { label: 'Total aceptado', value: totalAceptado, color: '#16A34A' },

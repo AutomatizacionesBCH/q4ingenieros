@@ -76,11 +76,11 @@ async function TablaTransacciones({ sp }: { sp: SP }) {
         {total.toLocaleString('es-CL')} registros · Neto {formatCLP(totalNeto)} · Bruto {formatCLP(totalBruto)}
       </div>
 
-      <div style={{
+      <div className="q4-table-wrap q4-scroll-touch" style={{
         background: T.card, borderRadius: 12, border: `1px solid ${T.border}`, overflow: 'auto',
         boxShadow: '0 1px 2px rgba(15,26,46,0.04)',
       }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
+        <table className="q4-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
           <thead>
             <tr style={{ borderBottom: `1px solid ${T.border}`, background: T.cardHover }}>
               {['Fecha', 'Empresa', 'CeCo', 'Descripción', 'Proveedor', 'Cuenta', 'Neto', 'Estado'].map(h => (
@@ -209,20 +209,20 @@ export default async function TransaccionesPage({
   const sp = await searchParams
 
   return (
-    <div style={{ padding: 28 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+    <div className="q4-page" style={{ padding: 28 }}>
+      <div className="q4-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ color: T.textPrimary, fontSize: 22, fontWeight: 700, margin: 0 }}>Transacciones</h1>
+          <h1 className="q4-h1" style={{ color: T.textPrimary, fontSize: 22, fontWeight: 700, margin: 0 }}>Transacciones</h1>
           <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>
             Click en cualquier celda para editar
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div className="q4-export-btns" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <ExportButtons tipo="transacciones" />
           <Link href="/transacciones/nueva" style={{
             background: T.orange, color: '#fff', borderRadius: 8,
-            padding: '7px 16px', fontSize: 13, fontWeight: 600, textDecoration: 'none',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+            padding: '8px 16px', fontSize: 13, fontWeight: 600, textDecoration: 'none',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.06)', whiteSpace: 'nowrap',
           }}>+ Nueva</Link>
         </div>
       </div>

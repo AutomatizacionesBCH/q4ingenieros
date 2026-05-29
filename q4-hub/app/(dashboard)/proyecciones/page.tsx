@@ -78,7 +78,7 @@ async function TablaProyecciones({ sp }: { sp: SP }) {
   return (
     <>
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 18 }}>
+      <div className="q4-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 18 }}>
         {[
           { label: 'Total página', value: totalGeneral, count: pagos.length, color: T.textPrimary },
           { label: 'Pendiente', value: Number(pendiente?._sum.gross ?? 0), count: pendiente?._count._all ?? 0, color: T.warning },
@@ -99,11 +99,11 @@ async function TablaProyecciones({ sp }: { sp: SP }) {
         ))}
       </div>
 
-      <div style={{
+      <div className="q4-table-wrap q4-scroll-touch" style={{
         background: T.card, borderRadius: 12, border: `1px solid ${T.border}`, overflow: 'auto',
         boxShadow: '0 1px 2px rgba(15,26,46,0.04)',
       }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
+        <table className="q4-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
           <thead>
             <tr style={{ borderBottom: `1px solid ${T.border}`, background: T.cardHover }}>
               {['Fecha', 'Empresa', 'CeCo', 'Descripción', 'Proveedor', 'Cuenta', 'Bruto', 'Estado'].map(h => (
@@ -230,20 +230,20 @@ export default async function ProyeccionesPage({
   const to = sp.to ? new Date(sp.to + 'T23:59:59') : friday
 
   return (
-    <div style={{ padding: 28 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+    <div className="q4-page" style={{ padding: 28 }}>
+      <div className="q4-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ color: T.textPrimary, fontSize: 22, fontWeight: 700, margin: 0 }}>Proyecciones</h1>
+          <h1 className="q4-h1" style={{ color: T.textPrimary, fontSize: 22, fontWeight: 700, margin: 0 }}>Proyecciones</h1>
           <div style={{ color: T.textSec, fontSize: 13, marginTop: 4 }}>
             Rango: {formatDate(from)} → {formatDate(to)} · Click en cualquier celda para editar
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div className="q4-export-btns" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <ExportButtons tipo="proyecciones" />
           <Link href={`/transacciones/nueva?movementType=EGRESO`} style={{
             background: T.orange, color: '#fff', borderRadius: 8,
-            padding: '7px 16px', fontSize: 13, fontWeight: 600, textDecoration: 'none',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+            padding: '8px 16px', fontSize: 13, fontWeight: 600, textDecoration: 'none',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.06)', whiteSpace: 'nowrap',
           }}>+ Nuevo egreso</Link>
         </div>
       </div>

@@ -17,10 +17,10 @@ export default async function PlanCuentasPage() {
   const egresos = accounts.filter(a => a.movementType === 'EGRESO')
 
   return (
-    <div style={{ padding: 32 }}>
+    <div className="q4-page" style={{ padding: 32 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h1 style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: 0 }}>
+          <h1 className="q4-h1" style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: 0 }}>
             Plan de Cuentas
           </h1>
           <div style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>

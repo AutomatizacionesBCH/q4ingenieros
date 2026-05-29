@@ -20,10 +20,128 @@
   --font-mono: ui-monospace, 'Cascadia Code', monospace;
 }
 
+* { box-sizing: border-box; }
+
 body {
-  background-color: #0F1A2E;
-  color: #F0EDE8;
+  background-color: #F0F2F6;
+  color: #0F1A2E;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input, select, textarea, button {
+  font-family: inherit;
+  font-size: 16px;  /* evita zoom en iOS al focus */
+}
+
+@media (min-width: 769px) {
+  input, select, textarea {
+    font-size: 13px;
+  }
 }
 
 .tabular { font-variant-numeric: tabular-nums; }
+
+/* ────────── Responsive utilities ────────── */
+
+/* MOBILE: padding reducido, grids a 1 columna, fuentes ligeramente más pequeñas */
+@media (max-width: 768px) {
+  .q4-page {
+    padding: 14px !important;
+  }
+  .q4-header-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+  .q4-header-row > * {
+    width: 100%;
+  }
+  .q4-kpi-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+  }
+  .q4-kpi-grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+  .q4-filter-grid,
+  .q4-filter-grid-7 {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+  }
+  .q4-filter-grid > button,
+  .q4-filter-grid-7 > button {
+    grid-column: 1 / -1;
+  }
+  .q4-table-wrap {
+    margin-left: -14px;
+    margin-right: -14px;
+    border-radius: 0 !important;
+    border-left: 0 !important;
+    border-right: 0 !important;
+  }
+  .q4-table {
+    font-size: 12px !important;
+  }
+  .q4-export-btns a {
+    flex: 1;
+    text-align: center;
+    padding: 9px 8px !important;
+  }
+  .q4-h1 {
+    font-size: 18px !important;
+  }
+  .q4-card {
+    padding: 14px !important;
+  }
+  .q4-form-grid,
+  .q4-form-grid-4 {
+    grid-template-columns: 1fr !important;
+  }
+  .q4-form-grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+  .q4-dash-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .q4-detail-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+/* TABLET (769–1024) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .q4-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .q4-filter-grid-7 {
+    grid-template-columns: repeat(3, 1fr) auto !important;
+  }
+  .q4-form-grid-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Scroll touch suave para tablas */
+.q4-scroll-touch {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Targets de toque accesibles */
+@media (max-width: 768px) {
+  a, button {
+    min-height: 36px;
+  }
+}
+
+/* Ocultar scrollbar en mobile nav */
+nav::-webkit-scrollbar {
+  display: none;
+}
+
+/* LayoutShell padding bottom para no tapar con la nav mobile */
+@media (max-width: 768px) {
+  main {
+    padding-bottom: 80px !important;
+  }
+}

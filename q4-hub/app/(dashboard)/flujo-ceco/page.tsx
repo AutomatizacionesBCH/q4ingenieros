@@ -29,8 +29,8 @@ export default async function FlujoCecoPage({
 
   if (!cecoId) {
     return (
-      <div style={{ padding: 32 }}>
-        <h1 style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, marginBottom: 4 }}>
+      <div className="q4-page" style={{ padding: 32 }}>
+        <h1 className="q4-h1" style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, marginBottom: 4 }}>
           Flujo por Centro de Costo
         </h1>
         <div style={{ color: '#475569', fontSize: 13, marginBottom: 28 }}>
@@ -47,7 +47,7 @@ export default async function FlujoCecoPage({
   })
   if (!ceco) {
     return (
-      <div style={{ padding: 32 }}>
+      <div className="q4-page" style={{ padding: 32 }}>
         <h1 style={{ color: '#0F1A2E', fontSize: 22 }}>CeCo no encontrado</h1>
         <Link href="/flujo-ceco" style={{ color: '#E5501E' }}>← Volver</Link>
       </div>
@@ -88,7 +88,7 @@ export default async function FlujoCecoPage({
   const pagado = Number(byStatus.find(x => x.status === 'PAGADO')?._sum.gross ?? 0)
 
   return (
-    <div style={{ padding: 32 }}>
+    <div className="q4-page" style={{ padding: 32 }}>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 20, marginBottom: 16 }}>
         <CeCoSelector cecos={cecoOptions} current={cecoId} />
         <div style={{ paddingBottom: 4 }}>
@@ -113,7 +113,7 @@ export default async function FlujoCecoPage({
       </div>
 
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 20 }}>
+      <div className="q4-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 20 }}>
         {[
           { label: 'Total tx', value: total.toLocaleString('es-CL'), color: '#0F1A2E', plain: true },
           { label: 'Ingresos (neto)', value: formatCLP(ingresos), color: '#16A34A' },
