@@ -72,4 +72,60 @@ export default async function FacturasEmitidasPage() {
             {facturas.map((f, i) => {
               const pendiente = Number(f.amount) - Number(f.received)
               return (
-                <tr key={f.i
+                <tr key={f.id} style={{
+                  borderBottom: '1px solid rgba(255,255,255,0.04)',
+                  background: i % 2 === 0 ? 'transparent' : '#F8FAFC',
+                }}>
+                  <td style={{ padding: '9px 14px', fontSize: 12, whiteSpace: 'nowrap' }}>
+                    <Link href={`/facturas-emitidas/${f.id}/editar`} style={{ color: '#E5501E', textDecoration: 'none' }}>
+                      {formatDate(f.issueDate)}
+                    </Link>
+                  </td>
+                  <td style={{ padding: '9px 14px', color: '#E5501E', fontSize: 12, fontFamily: 'monospace' }}>{f.epNumber ?? '—'}</td>
+                  <td style={{ padding: '9px 14px', color: '#0F1A2E', fontSize: 13 }}>{f.invoiceNumber ?? '—'}</td>
+                  <td style={{ padding: '9px 14px', color: '#475569', fontSize: 12 }}>{f.company.name.split(' ')[0]}</td>
+                  <td style={{ padding: '9px 14px', color: '#E5501E', fontSize: 12, fontFamily: 'monospace' }}>{f.costCenter?.code ?? '—'}</td>
+                  <td style={{ padding: '9px 14px', textAlign: 'right', color: '#0F1A2E', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
+                    {formatCLP(Number(f.amount))}
+                  </td>
+                  <td style={{ padding: '9px 14px', textAlign: 'right', fontSize: 13, fontVariantNumeric: 'tabular-nums',
+                    color: pendiente <= 0 ? '#16A34A' : '#CA8A04' }}>
+                    {formatCLP(Number(f.received))}
+                    {pendiente > 0 && (
+                      <div style={{ fontSize: 10, color: '#94A3B8' }}>falta {formatCLP(pendiente)}</div>
+                    )}
+                  </td>
+                  <td style={{ padding: '9px 14px' }}>
+                    <span style={{
+                      background: STATUS_COLORS[f.status] + '22',
+                      color: STATUS_COLORS[f.status],
+                      borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700,
+                    }}>{f.status}</span>
+                    {f.factoring && (
+                      <span style={{
+                        background: 'rgba(229,80,30,0.15)', color: '#E5501E',
+                        borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700, marginLeft: 4,
+                      }}>FACT</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '9px 14px', textAlign: 'right' }}>
+                    {f.status !== 'PAGADO' && (
+                      <MarcarRecibidaButton id={f.id} amount={Number(f.amount)} />
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+            {facturas.length === 0 && (
+              <tr>
+                <td colSpan={9} style={{ padding: '32px 14px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
+                  Sin facturas emitidas — usa &ldquo;+ Nueva factura&rdquo; arriba
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}

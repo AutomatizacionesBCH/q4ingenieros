@@ -106,4 +106,135 @@ async function TablaTransacciones({ sp }: { sp: SP }) {
                       value={paymentDateStr}
                       display={
                         best ? (
-                          <span
+                          <span style={{ color: T.orange, fontWeight: 600 }}>
+                            {formatDate(best.date)}
+                            {best.kind !== 'pago' && (
+                              <span style={{ color: T.textMuted, fontSize: 9, marginLeft: 4, fontWeight: 500 }}>
+                                ({best.kind})
+                              </span>
+                            )}
+                          </span>
+                        ) : null
+                      }
+                    />
+                  </td>
+                  <td style={{ padding: '6px 10px', color: T.textSec, fontSize: 12 }}>
+                    {tx.company.name.split(' ')[0]}
+                  </td>
+                  <td style={{ padding: '2px 4px' }}>
+                    <CecoAutocomplete txId={tx.id}
+                      currentCode={tx.costCenter?.code ?? null}
+                      currentId={tx.costCenterId ?? null}
+                      cecos={cecos.map(c => ({ id: c.id, code: c.code, name: c.name }))} />
+                  </td>
+                  <td style={{ padding: '2px 4px', maxWidth: 340 }}>
+                    <EditableCell txId={tx.id} field="description" kind="text"
+                      value={tx.description}
+                      display={
+                        <span style={{
+                          color: T.textPrimary, fontSize: 13,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          display: 'block',
+                        }} title={tx.description}>
+                          {tx.description}
+                        </span>
+                      }
+                    />
+                  </td>
+                  <td style={{ padding: '2px 4px', maxWidth: 180 }}>
+                    <ProveedorAutocomplete txId={tx.id}
+                      currentName={tx.provider?.name ?? null}
+                      currentId={tx.providerId ?? null}
+                      providers={providers.map(p => ({ id: p.id, name: p.name }))} />
+                  </td>
+                  <td style={{ padding: '6px 10px', color: T.textMuted, fontSize: 12, fontFamily: 'monospace' }}>
+                    {tx.account?.code ?? '—'}
+                  </td>
+                  <td style={{ padding: '2px 4px', textAlign: 'right' }}>
+                    <EditableCell txId={tx.id} field="net" kind="money"
+                      value={Number(tx.net)}
+                      align="right"
+                      color={tx.movementType === 'INGRESO' ? T.success : T.textPrimary}
+                      fontWeight={600}
+                      display={
+                        <span style={{
+                          color: tx.movementType === 'INGRESO' ? T.success : T.textPrimary,
+                          fontWeight: 600, fontVariantNumeric: 'tabular-nums',
+                        }}>
+                          {formatCLP(Number(tx.net))}
+                        </span>
+                      }
+                    />
+                  </td>
+                  <td style={{ padding: '6px 10px' }}>
+                    <StatusBadge txId={tx.id} status={tx.status} />
+                  </td>
+                </tr>
+              )
+            })}
+            {txs.length === 0 && (
+              <tr>
+                <td colSpan={8} style={{ padding: '40px 14px', textAlign: 'center', color: T.textMuted, fontSize: 13 }}>
+                  Sin transacciones en estos filtros
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <Pagination total={total} page={page} limit={limit} />
+    </>
+  )
+}
+
+async function FiltrosWrapper() {
+  const [companies, cecos, accounts] = await Promise.all([
+    getCompanies(), getCecos(), getAccounts(),
+  ])
+  return (
+    <TransaccionesFilters
+      companies={companies.map(c => ({ id: c.id, label: c.name }))}
+      cecos={cecos.map(c => ({ id: c.id, label: `${c.code} · ${c.name}` }))}
+      accounts={accounts.map(a => ({ id: a.id, label: `${a.code} · ${a.name}` }))}
+    />
+  )
+}
+
+export default async function TransaccionesPage({
+  searchParams,
+}: {
+  searchParams: Promise<SP>
+}) {
+  const sp = await searchParams
+
+  return (
+    <div style={{ padding: 28 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+        <div>
+          <h1 style={{ color: T.textPrimary, fontSize: 22, fontWeight: 700, margin: 0 }}>Transacciones</h1>
+          <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>
+            Click en cualquier celda para editar
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <ExportButtons tipo="transacciones" />
+          <Link href="/transacciones/nueva" style={{
+            background: T.orange, color: '#fff', borderRadius: 8,
+            padding: '7px 16px', fontSize: 13, fontWeight: 600, textDecoration: 'none',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+          }}>+ Nueva</Link>
+        </div>
+      </div>
+
+      <Suspense fallback={<div style={{ height: 75, background: T.card, borderRadius: 12,
+        border: `1px solid ${T.border}`, marginBottom: 14 }} />}>
+        <FiltrosWrapper />
+      </Suspense>
+
+      <Suspense fallback={<TableSkeleton rows={12} />}>
+        <TablaTransacciones sp={sp} />
+      </Suspense>
+    </div>
+  )
+}

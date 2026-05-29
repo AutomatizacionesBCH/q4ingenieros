@@ -58,4 +58,25 @@ export default async function ReportesPage() {
               ].map(row => (
                 <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: T.textSec, fontSize: 13 }}>{row.label}</span>
-                  <span style={{ color: row.color, fontSize: 14, fontVariant
+                  <span style={{ color: row.color, fontSize: 14, fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
+                    {formatCLP(row.value)}
+                  </span>
+                </div>
+              ))}
+              <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 12,
+                display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: T.textPrimary, fontSize: 13, fontWeight: 700 }}>Resultado</span>
+                <span style={{
+                  fontSize: 16, fontVariantNumeric: 'tabular-nums', fontWeight: 700,
+                  color: r.resultado >= 0 ? T.success : T.danger,
+                }}>
+                  {formatCLP(r.resultado)}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}

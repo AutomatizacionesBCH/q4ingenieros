@@ -51,4 +51,32 @@ export default async function CentroCostoPage() {
                 background: i % 2 === 0 ? 'transparent' : '#F8FAFC',
               }}>
                 <td style={{ padding: '10px 16px', fontSize: 13, fontFamily: 'monospace' }}>
-                  <Link href={`/centros-costo/${c.id}/editar`} style={{ color: '#E5501E', textDecorati
+                  <Link href={`/centros-costo/${c.id}/editar`} style={{ color: '#E5501E', textDecoration: 'none' }}>
+                    {c.code}
+                  </Link>
+                </td>
+                <td style={{ padding: '10px 16px', color: '#0F1A2E', fontSize: 13 }}>{c.name}</td>
+                <td style={{ padding: '10px 16px', color: '#475569', fontSize: 12 }}>{c.company.name}</td>
+                <td style={{ padding: '10px 16px', color: '#475569', fontSize: 12 }}>{c.projectNumber ?? '—'}</td>
+                <td style={{ padding: '10px 16px', color: '#475569', fontSize: 12 }}>{c.location ?? '—'}</td>
+                <td style={{ padding: '10px 16px', color: '#94A3B8', fontSize: 11, textAlign: 'right' }}>
+                  {c._count.transactions.toLocaleString('es-CL')}
+                </td>
+                <td style={{ padding: '10px 16px', textAlign: 'right' }}>
+                  <DeleteMaestroButton url={`/api/maestros/ceco/${c.id}`} label={`el CeCo ${c.code}`} />
+                </td>
+              </tr>
+            ))}
+            {cecos.length === 0 && (
+              <tr>
+                <td colSpan={7} style={{ padding: '32px 16px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
+                  Sin centros de costo — usa &ldquo;+ Nuevo CeCo&rdquo; arriba
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}

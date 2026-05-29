@@ -84,4 +84,49 @@ export default async function OrdenesCompraPage() {
                 opacity: oc.status !== 'ACTIVA' ? 0.6 : 1,
               }}>
                 <td style={{ padding: '10px 14px' }}>
-                  <Link href={`/ordenes-compra/${oc.id}`} style={{ color: '#E5501E'
+                  <Link href={`/ordenes-compra/${oc.id}`} style={{ color: '#E5501E', fontSize: 12, fontFamily: 'monospace', textDecoration: 'none' }}>
+                    OC-{String(oc.id).padStart(4, '0')}
+                  </Link>
+                </td>
+                <td style={{ padding: '10px 14px', color: '#475569', fontSize: 12 }}>{oc.costCenter?.code ?? '—'}</td>
+                <td style={{ padding: '10px 14px', color: '#0F1A2E', fontSize: 13, maxWidth: 280,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={oc.description}>{oc.description}</td>
+                <td style={{ padding: '10px 14px', color: '#475569', fontSize: 12 }}>{oc.provider?.name ?? '—'}</td>
+                <td style={{ padding: '10px 14px', textAlign: 'right', color: '#0F1A2E', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
+                  {formatCLP(Number(oc.total))}
+                </td>
+                <td style={{ padding: '10px 14px', textAlign: 'right', color: '#16A34A', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
+                  {formatCLP(oc.pagado)}
+                  {oc.pendiente > 0 && (
+                    <div style={{ fontSize: 10, color: '#CA8A04' }}>+{formatCLP(oc.pendiente)} pend.</div>
+                  )}
+                </td>
+                <td style={{ padding: '10px 14px', textAlign: 'right',
+                  color: oc.saldo < 0 ? '#DC2626' : '#16A34A', fontSize: 13, fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
+                  {formatCLP(oc.saldo)}
+                </td>
+                <td style={{ padding: '10px 14px' }}>
+                  <span style={{
+                    background: STATUS_COLOR[oc.status] + '22',
+                    color: STATUS_COLOR[oc.status],
+                    borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700,
+                  }}>{oc.status}</span>
+                </td>
+                <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                  <CerrarOCButton id={oc.id} currentStatus={oc.status} />
+                </td>
+              </tr>
+            ))}
+            {enriched.length === 0 && (
+              <tr>
+                <td colSpan={9} style={{ padding: '32px 14px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
+                  Sin órdenes de compra — usa &ldquo;+ Nueva OC&rdquo; arriba
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
