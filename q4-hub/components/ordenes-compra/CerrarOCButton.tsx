@@ -36,12 +36,12 @@ export function CerrarOCButton({ id, currentStatus }: { id: number; currentStatu
 
   const style: React.CSSProperties = isClosed
     ? {
-        background: loading ? '#1D2D47' : 'rgba(212,160,23,0.12)',
-        color: '#D4A017', border: '1px solid rgba(212,160,23,0.3)',
+        background: loading ? '#F8FAFC' : '#FEFCE8',
+        color: '#CA8A04', border: '1px solid rgba(212,160,23,0.3)',
       }
     : {
-        background: loading ? '#1D2D47' : 'rgba(90,112,144,0.18)',
-        color: '#8A9BB8', border: '1px solid rgba(255,255,255,0.1)',
+        background: loading ? '#F8FAFC' : '#F1F5F9',
+        color: '#475569', border: '1px solid rgba(255,255,255,0.1)',
       }
 
   return (

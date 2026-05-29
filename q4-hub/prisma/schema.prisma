@@ -165,8 +165,15 @@ model Transaction {
 
   @@index([companyId])
   @@index([costCenterId])
+  @@index([accountId])
+  @@index([providerId])
+  @@index([purchaseOrderId])
   @@index([paymentDate])
   @@index([status])
+  @@index([movementType])
+  @@index([status, paymentDate])
+  @@index([companyId, paymentDate])
+  @@index([costCenterId, paymentDate])
 }
 
 model PurchaseOrder {

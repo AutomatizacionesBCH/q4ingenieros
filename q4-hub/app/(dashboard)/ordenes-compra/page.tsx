@@ -5,7 +5,7 @@ import { formatCLP } from '@/lib/fmt'
 import Link from 'next/link'
 import { CerrarOCButton } from '@/components/ordenes-compra/CerrarOCButton'
 
-const STATUS_COLOR: Record<string, string> = { ACTIVA: '#3D8B5E', CERRADA: '#5A7090', CANCELADA: '#C0392B' }
+const STATUS_COLOR: Record<string, string> = { ACTIVA: '#16A34A', CERRADA: '#94A3B8', CANCELADA: '#DC2626' }
 
 export default async function OrdenesCompraPage() {
   const ocs = await prisma.purchaseOrder.findMany({
@@ -32,8 +32,8 @@ export default async function OrdenesCompraPage() {
     <div style={{ padding: 32 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <h1 style={{ color: '#F0EDE8', fontSize: 22, fontWeight: 700, margin: 0 }}>Órdenes de Compra</h1>
-          <div style={{ color: '#8A9BB8', fontSize: 13, marginTop: 4 }}>
+          <h1 style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: 0 }}>Órdenes de Compra</h1>
+          <div style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>
             {enriched.length} OC · {activas} activas
           </div>
         </div>
@@ -46,15 +46,15 @@ export default async function OrdenesCompraPage() {
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
         {[
-          { label: 'Total comprometido OC', value: totalOC, color: '#F0EDE8' },
-          { label: 'Total pagado', value: totalPagado, color: '#3D8B5E' },
-          { label: 'Saldo disponible', value: totalSaldo, color: totalSaldo >= 0 ? '#E5501E' : '#C0392B' },
+          { label: 'Total comprometido OC', value: totalOC, color: '#0F1A2E' },
+          { label: 'Total pagado', value: totalPagado, color: '#16A34A' },
+          { label: 'Saldo disponible', value: totalSaldo, color: totalSaldo >= 0 ? '#E5501E' : '#DC2626' },
         ].map(k => (
           <div key={k.label} style={{
-            background: '#162138', borderRadius: 12,
+            background: '#FFFFFF', borderRadius: 12,
             border: '1px solid rgba(255,255,255,0.08)', padding: '14px 18px',
           }}>
-            <div style={{ color: '#5A7090', fontSize: 10, fontWeight: 700,
+            <div style={{ color: '#94A3B8', fontSize: 10, fontWeight: 700,
               textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{k.label}</div>
             <div style={{ color: k.color, fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
               {formatCLP(k.value)}
@@ -63,14 +63,14 @@ export default async function OrdenesCompraPage() {
         ))}
       </div>
 
-      <div style={{ background: '#162138', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'auto' }}>
+      <div style={{ background: '#FFFFFF', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
               {['ID', 'CeCo', 'Descripción', 'Proveedor', 'Total OC', 'Pagado', 'Saldo', 'Estado', 'Acción'].map(h => (
                 <th key={h} style={{
                   padding: '12px 14px', textAlign: ['Total OC', 'Pagado', 'Saldo'].includes(h) ? 'right' : 'left',
-                  color: '#5A7090', fontSize: 11, fontWeight: 700,
+                  color: '#94A3B8', fontSize: 11, fontWeight: 700,
                   letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap',
                 }}>{h}</th>
               ))}
@@ -80,7 +80,7 @@ export default async function OrdenesCompraPage() {
             {enriched.map((oc, i) => (
               <tr key={oc.id} style={{
                 borderBottom: '1px solid rgba(255,255,255,0.04)',
-                background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
+                background: i % 2 === 0 ? 'transparent' : '#F8FAFC',
                 opacity: oc.status !== 'ACTIVA' ? 0.6 : 1,
               }}>
                 <td style={{ padding: '10px 14px' }}>
@@ -88,21 +88,21 @@ export default async function OrdenesCompraPage() {
                     OC-{String(oc.id).padStart(4, '0')}
                   </Link>
                 </td>
-                <td style={{ padding: '10px 14px', color: '#8A9BB8', fontSize: 12 }}>{oc.costCenter?.code ?? '—'}</td>
-                <td style={{ padding: '10px 14px', color: '#F0EDE8', fontSize: 13, maxWidth: 280,
+                <td style={{ padding: '10px 14px', color: '#475569', fontSize: 12 }}>{oc.costCenter?.code ?? '—'}</td>
+                <td style={{ padding: '10px 14px', color: '#0F1A2E', fontSize: 13, maxWidth: 280,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={oc.description}>{oc.description}</td>
-                <td style={{ padding: '10px 14px', color: '#8A9BB8', fontSize: 12 }}>{oc.provider?.name ?? '—'}</td>
-                <td style={{ padding: '10px 14px', textAlign: 'right', color: '#F0EDE8', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
+                <td style={{ padding: '10px 14px', color: '#475569', fontSize: 12 }}>{oc.provider?.name ?? '—'}</td>
+                <td style={{ padding: '10px 14px', textAlign: 'right', color: '#0F1A2E', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
                   {formatCLP(Number(oc.total))}
                 </td>
-                <td style={{ padding: '10px 14px', textAlign: 'right', color: '#3D8B5E', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
+                <td style={{ padding: '10px 14px', textAlign: 'right', color: '#16A34A', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
                   {formatCLP(oc.pagado)}
                   {oc.pendiente > 0 && (
-                    <div style={{ fontSize: 10, color: '#D4A017' }}>+{formatCLP(oc.pendiente)} pend.</div>
+                    <div style={{ fontSize: 10, color: '#CA8A04' }}>+{formatCLP(oc.pendiente)} pend.</div>
                   )}
                 </td>
                 <td style={{ padding: '10px 14px', textAlign: 'right',
-                  color: oc.saldo < 0 ? '#C0392B' : '#3D8B5E', fontSize: 13, fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
+                  color: oc.saldo < 0 ? '#DC2626' : '#16A34A', fontSize: 13, fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
                   {formatCLP(oc.saldo)}
                 </td>
                 <td style={{ padding: '10px 14px' }}>
@@ -119,7 +119,7 @@ export default async function OrdenesCompraPage() {
             ))}
             {enriched.length === 0 && (
               <tr>
-                <td colSpan={9} style={{ padding: '32px 14px', textAlign: 'center', color: '#5A7090', fontSize: 13 }}>
+                <td colSpan={9} style={{ padding: '32px 14px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
                   Sin órdenes de compra — usa &ldquo;+ Nueva OC&rdquo; arriba
                 </td>
               </tr>

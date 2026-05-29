@@ -2,10 +2,12 @@ export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
-import { formatCLP, formatDate } from '@/lib/fmt'
+import { formatCLP, formatDate, bestDate } from '@/lib/fmt'
+import { T, STATUS_COLOR } from '@/lib/theme'
 import { TransaccionesFilters } from '@/components/transacciones/TransaccionesFilters'
 import { StatusBadge } from '@/components/transacciones/StatusBadge'
 import { Pagination } from '@/components/Pagination'
+import { getCompanies, getCecos, getAccounts } from '@/lib/maestros-cache'
 import type { Prisma } from '@prisma/client'
 
 export default async function TransaccionesPage({
@@ -42,17 +44,17 @@ export default async function TransaccionesPage({
     prisma.transaction.count({ where }),
     prisma.transaction.findMany({
       where, skip: (page - 1) * limit, take: limit,
-      include: {
+      select: {
+        id: true, description: true, paymentDate: true, docDueDate: true, docIssueDate: true,
+        createdAt: true, net: true, gross: true, status: true, movementType: true,
         costCenter: { select: { code: true, name: true } },
         company: { select: { name: true } },
         provider: { select: { name: true } },
         account: { select: { code: true } },
       },
-      orderBy: [{ paymentDate: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [{ paymentDate: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }],
     }),
-    prisma.company.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
-    prisma.costCenter.findMany({ select: { id: true, code: true, name: true }, orderBy: { code: 'asc' } }),
-    prisma.account.findMany({ select: { id: true, code: true, name: true }, orderBy: { code: 'asc' } }),
+    getCompanies(), getCecos(), getAccounts(),
     prisma.transaction.aggregate({ where, _sum: { gross: true, net: true } }),
   ])
 
@@ -60,19 +62,20 @@ export default async function TransaccionesPage({
   const totalNeto = Number(agg._sum.net ?? 0)
 
   return (
-    <div style={{ padding: 32 }}>
+    <div style={{ padding: 28 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
-          <h1 style={{ color: '#F0EDE8', fontSize: 22, fontWeight: 700, margin: 0 }}>
+          <h1 style={{ color: T.textPrimary, fontSize: 22, fontWeight: 700, margin: 0 }}>
             Transacciones
           </h1>
-          <div style={{ color: '#8A9BB8', fontSize: 13, marginTop: 4 }}>
+          <div style={{ color: T.textSec, fontSize: 13, marginTop: 4 }}>
             {total.toLocaleString('es-CL')} registros · Neto {formatCLP(totalNeto)} · Bruto {formatCLP(totalBruto)}
           </div>
         </div>
         <Link href="/transacciones/nueva" style={{
-          background: '#E5501E', color: '#fff', borderRadius: 8,
-          padding: '8px 16px', fontSize: 13, fontWeight: 600, textDecoration: 'none',
+          background: T.orange, color: '#fff', borderRadius: 8,
+          padding: '9px 18px', fontSize: 13, fontWeight: 600, textDecoration: 'none',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
         }}>+ Nueva</Link>
       </div>
 
@@ -82,62 +85,78 @@ export default async function TransaccionesPage({
         accounts={accounts.map(a => ({ id: a.id, label: `${a.code} · ${a.name}` }))}
       />
 
-      <div style={{ background: '#162138', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'auto' }}>
+      <div style={{
+        background: T.card, borderRadius: 12, border: `1px solid ${T.border}`, overflow: 'auto',
+        boxShadow: '0 1px 2px rgba(15,26,46,0.04)',
+      }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+            <tr style={{ borderBottom: `1px solid ${T.border}`, background: T.cardHover }}>
               {['Fecha', 'Empresa', 'CeCo', 'Descripción', 'Proveedor', 'Cuenta', 'Neto', 'Estado'].map(h => (
                 <th key={h} style={{
                   padding: '12px 14px', textAlign: h === 'Neto' ? 'right' : 'left',
-                  color: '#5A7090', fontSize: 11, fontWeight: 700,
+                  color: T.textMuted, fontSize: 10, fontWeight: 700,
                   letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap',
                 }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {txs.map((tx, i) => (
-              <tr key={tx.id} style={{
-                borderBottom: '1px solid rgba(255,255,255,0.04)',
-                background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
-              }}>
-                <td style={{ padding: '9px 14px', fontSize: 12, whiteSpace: 'nowrap' }}>
-                  <Link href={`/transacciones/${tx.id}/editar`} style={{ color: '#E5501E', textDecoration: 'none' }}>
-                    {formatDate(tx.paymentDate)}
-                  </Link>
-                </td>
-                <td style={{ padding: '9px 14px', color: '#8A9BB8', fontSize: 12 }}>
-                  {tx.company.name.split(' ')[0]}
-                </td>
-                <td style={{ padding: '9px 14px', color: '#E5501E', fontSize: 12, fontFamily: 'monospace' }}
-                  title={tx.costCenter?.name ?? ''}>
-                  {tx.costCenter?.code ?? '—'}
-                </td>
-                <td style={{ padding: '9px 14px', color: '#F0EDE8', fontSize: 13, maxWidth: 320,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tx.description}>
-                  {tx.description}
-                </td>
-                <td style={{ padding: '9px 14px', color: '#8A9BB8', fontSize: 12, maxWidth: 180,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tx.provider?.name ?? ''}>
-                  {tx.provider?.name ?? '—'}
-                </td>
-                <td style={{ padding: '9px 14px', color: '#5A7090', fontSize: 12 }}>
-                  {tx.account?.code ?? '—'}
-                </td>
-                <td style={{ padding: '9px 14px', fontSize: 13,
-                  textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                  <span style={{ color: tx.movementType === 'INGRESO' ? '#3D8B5E' : '#F0EDE8' }}>
+            {txs.map((tx, i) => {
+              const best = bestDate(tx)
+              return (
+                <tr key={tx.id} style={{
+                  borderBottom: `1px solid ${T.border}`,
+                  background: i % 2 === 0 ? T.card : T.cardHover,
+                }}>
+                  <td style={{ padding: '10px 14px', fontSize: 12, whiteSpace: 'nowrap' }}>
+                    <Link href={`/transacciones/${tx.id}/editar`} style={{
+                      color: T.orange, textDecoration: 'none', fontWeight: 600,
+                    }}>
+                      {best ? formatDate(best.date) : '—'}
+                      {best && best.kind !== 'pago' && (
+                        <span style={{ color: T.textMuted, fontSize: 9, marginLeft: 4, fontWeight: 500 }}>
+                          ({best.kind})
+                        </span>
+                      )}
+                    </Link>
+                  </td>
+                  <td style={{ padding: '10px 14px', color: T.textSec, fontSize: 12 }}>
+                    {tx.company.name.split(' ')[0]}
+                  </td>
+                  <td style={{ padding: '10px 14px', fontSize: 12, fontFamily: 'monospace' }}
+                    title={tx.costCenter?.name ?? ''}>
+                    <Link href={`/flujo-ceco?ceco=${cecos.find(c => c.code === tx.costCenter?.code)?.id ?? ''}`}
+                      style={{ color: T.orange, textDecoration: 'none' }}>
+                      {tx.costCenter?.code ?? '—'}
+                    </Link>
+                  </td>
+                  <td style={{ padding: '10px 14px', color: T.textPrimary, fontSize: 13, maxWidth: 340,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tx.description}>
+                    {tx.description}
+                  </td>
+                  <td style={{ padding: '10px 14px', color: T.textSec, fontSize: 12, maxWidth: 180,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    title={tx.provider?.name ?? ''}>
+                    {tx.provider?.name ?? '—'}
+                  </td>
+                  <td style={{ padding: '10px 14px', color: T.textMuted, fontSize: 12, fontFamily: 'monospace' }}>
+                    {tx.account?.code ?? '—'}
+                  </td>
+                  <td style={{ padding: '10px 14px', fontSize: 13,
+                    textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600,
+                    color: tx.movementType === 'INGRESO' ? T.success : T.textPrimary }}>
                     {formatCLP(Number(tx.net))}
-                  </span>
-                </td>
-                <td style={{ padding: '9px 14px' }}>
-                  <StatusBadge txId={tx.id} status={tx.status} />
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td style={{ padding: '10px 14px' }}>
+                    <StatusBadge txId={tx.id} status={tx.status} />
+                  </td>
+                </tr>
+              )
+            })}
             {txs.length === 0 && (
               <tr>
-                <td colSpan={8} style={{ padding: '40px 14px', textAlign: 'center', color: '#5A7090', fontSize: 13 }}>
+                <td colSpan={8} style={{ padding: '40px 14px', textAlign: 'center', color: T.textMuted, fontSize: 13 }}>
                   Sin transacciones en estos filtros
                 </td>
               </tr>

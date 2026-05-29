@@ -36,12 +36,12 @@ export function MarcarPagadoButton({ txId, currentStatus }: { txId: number; curr
 
   const style: React.CSSProperties = isRevert
     ? {
-        background: loading ? '#1D2D47' : 'rgba(212,160,23,0.12)',
-        color: '#D4A017', border: '1px solid rgba(212,160,23,0.3)',
+        background: loading ? '#F8FAFC' : '#FEFCE8',
+        color: '#CA8A04', border: '1px solid rgba(212,160,23,0.3)',
       }
     : {
-        background: loading ? '#1D2D47' : 'rgba(61,139,94,0.15)',
-        color: '#3D8B5E', border: '1px solid rgba(61,139,94,0.3)',
+        background: loading ? '#F8FAFC' : '#F0FDF4',
+        color: '#16A34A', border: '1px solid rgba(61,139,94,0.3)',
       }
 
   return (

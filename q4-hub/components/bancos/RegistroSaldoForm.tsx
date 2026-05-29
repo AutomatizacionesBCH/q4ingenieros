@@ -5,13 +5,13 @@ import { useRouter } from 'next/navigation'
 type Company = { id: number; name: string }
 
 const C = {
-  bg: '#162138',
-  border: 'rgba(255,255,255,0.08)',
-  text: '#F0EDE8',
-  dim: '#8A9BB8',
-  muted: '#5A7090',
+  bg: '#FFFFFF',
+  border: '#E2E8F0',
+  text: '#0F1A2E',
+  dim: '#475569',
+  muted: '#94A3B8',
   orange: '#E5501E',
-  field: '#0F1A2E',
+  field: '#F0F2F6',
 }
 
 const inputStyle: React.CSSProperties = {
@@ -100,8 +100,8 @@ export function RegistroSaldoForm({ companies }: { companies: Company[] }) {
 
       {error && (
         <div style={{
-          background: 'rgba(192,57,43,0.15)', border: '1px solid rgba(192,57,43,0.3)',
-          borderRadius: 8, padding: '8px 12px', color: '#E0928B', fontSize: 12,
+          background: '#FEF2F2', border: '1px solid rgba(192,57,43,0.3)',
+          borderRadius: 8, padding: '8px 12px', color: '#DC2626', fontSize: 12,
           marginBottom: 14,
         }}>{error}</div>
       )}

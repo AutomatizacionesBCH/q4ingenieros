@@ -4,11 +4,11 @@ const s = StyleSheet.create({
   page: { backgroundColor: '#fff', padding: 48, fontFamily: 'Helvetica' },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 32, borderBottom: '2pt solid #E5501E', paddingBottom: 16 },
   title: { fontSize: 18, fontWeight: 'bold', color: '#0F1A2E' },
-  subtitle: { fontSize: 10, color: '#8A9BB8', marginTop: 2 },
+  subtitle: { fontSize: 10, color: '#475569', marginTop: 2 },
   sectionTitle: { fontSize: 11, fontWeight: 'bold', color: '#E5501E', textTransform: 'uppercase',
     letterSpacing: 1, marginBottom: 8, marginTop: 20 },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  label: { fontSize: 9, color: '#8A9BB8', width: '40%' },
+  label: { fontSize: 9, color: '#475569', width: '40%' },
   value: { fontSize: 9, color: '#0F1A2E', width: '58%' },
   totalBox: { backgroundColor: '#0F1A2E', padding: '10 16', borderRadius: 4, marginTop: 16,
     flexDirection: 'row', justifyContent: 'space-between' },
@@ -16,7 +16,7 @@ const s = StyleSheet.create({
   totalValue: { fontSize: 14, color: '#E5501E', fontWeight: 'bold' },
   footer: { position: 'absolute', bottom: 32, left: 48, right: 48, borderTop: '1pt solid #E8E8E8',
     paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between' },
-  footerText: { fontSize: 8, color: '#8A9BB8' },
+  footerText: { fontSize: 8, color: '#475569' },
 })
 
 interface Props {

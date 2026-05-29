@@ -7,7 +7,7 @@ import { AvanzarEstadoButton } from '@/components/propuestas/AvanzarEstadoButton
 import { EliminarPropuestaButton } from '@/components/propuestas/EliminarPropuestaButton'
 
 const STATUS_COLOR: Record<string, string> = {
-  BORRADOR: '#5A7090', ENVIADA: '#D4A017', ACEPTADA: '#3D8B5E',
+  BORRADOR: '#94A3B8', ENVIADA: '#CA8A04', ACEPTADA: '#16A34A',
 }
 
 type ContentJson = {
@@ -41,8 +41,8 @@ export default async function PropuestasCierrePage() {
     <div style={{ padding: 32 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <h1 style={{ color: '#F0EDE8', fontSize: 22, fontWeight: 700, margin: 0 }}>Propuestas de Cierre</h1>
-          <div style={{ color: '#8A9BB8', fontSize: 13, marginTop: 4 }}>
+          <h1 style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: 0 }}>Propuestas de Cierre</h1>
+          <div style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>
             {enriched.length} propuestas · {borradores} borradores · {enviadas} enviadas · {aceptadas.length} aceptadas
           </div>
         </div>
@@ -55,15 +55,15 @@ export default async function PropuestasCierrePage() {
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
         {[
-          { label: 'Total en propuestas', value: totalGeneral, color: '#F0EDE8' },
-          { label: 'Total aceptado', value: totalAceptado, color: '#3D8B5E' },
-          { label: 'Pendiente respuesta', value: totalGeneral - totalAceptado, color: '#D4A017' },
+          { label: 'Total en propuestas', value: totalGeneral, color: '#0F1A2E' },
+          { label: 'Total aceptado', value: totalAceptado, color: '#16A34A' },
+          { label: 'Pendiente respuesta', value: totalGeneral - totalAceptado, color: '#CA8A04' },
         ].map(k => (
           <div key={k.label} style={{
-            background: '#162138', borderRadius: 12,
+            background: '#FFFFFF', borderRadius: 12,
             border: '1px solid rgba(255,255,255,0.08)', padding: '14px 18px',
           }}>
-            <div style={{ color: '#5A7090', fontSize: 10, fontWeight: 700,
+            <div style={{ color: '#94A3B8', fontSize: 10, fontWeight: 700,
               textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{k.label}</div>
             <div style={{ color: k.color, fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
               {formatCLP(k.value)}
@@ -73,9 +73,9 @@ export default async function PropuestasCierrePage() {
       </div>
 
       {enriched.length === 0 ? (
-        <div style={{ background: '#162138', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
+        <div style={{ background: '#FFFFFF', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
           padding: '48px 32px', textAlign: 'center' }}>
-          <div style={{ color: '#5A7090', fontSize: 14, marginBottom: 12 }}>Sin propuestas de cierre</div>
+          <div style={{ color: '#94A3B8', fontSize: 14, marginBottom: 12 }}>Sin propuestas de cierre</div>
           <Link href="/propuestas-cierre/nueva" style={{
             color: '#E5501E', fontSize: 13, fontWeight: 600, textDecoration: 'none',
           }}>+ Crear primera propuesta</Link>
@@ -84,7 +84,7 @@ export default async function PropuestasCierrePage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {enriched.map(p => (
             <div key={p.id} style={{
-              background: '#162138', borderRadius: 12,
+              background: '#FFFFFF', borderRadius: 12,
               border: '1px solid rgba(255,255,255,0.08)', padding: '16px 20px',
               opacity: p.status === 'ACEPTADA' ? 0.85 : 1,
             }}>
@@ -99,13 +99,13 @@ export default async function PropuestasCierrePage() {
                       color: STATUS_COLOR[p.status],
                       borderRadius: 6, padding: '2px 8px', fontSize: 10, fontWeight: 700,
                     }}>{p.status}</span>
-                    <span style={{ color: '#5A7090', fontSize: 11 }}>{formatDate(p.createdAt)}</span>
+                    <span style={{ color: '#94A3B8', fontSize: 11 }}>{formatDate(p.createdAt)}</span>
                   </div>
-                  <div style={{ color: '#F0EDE8', fontSize: 14, fontWeight: 600, marginBottom: 4,
+                  <div style={{ color: '#0F1A2E', fontSize: 14, fontWeight: 600, marginBottom: 4,
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {p.description}
                   </div>
-                  <div style={{ color: '#5A7090', fontSize: 12 }}>
+                  <div style={{ color: '#94A3B8', fontSize: 12 }}>
                     {p.costCenter ? `${p.costCenter.code} · ${p.costCenter.name}` : 'Sin CeCo'}
                     {p.provider ? ` · ${p.provider.name}` : ''}
                     {' · '}{p.itemCount} ítems
@@ -121,13 +121,13 @@ export default async function PropuestasCierrePage() {
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <AvanzarEstadoButton id={p.id} currentStatus={p.status} />
                     <a href={`/api/pdf/propuesta/${p.id}`} target="_blank" rel="noopener noreferrer" style={{
-                      background: '#1D2D47', color: '#8A9BB8',
+                      background: '#F8FAFC', color: '#475569',
                       border: '1px solid rgba(255,255,255,0.08)',
                       borderRadius: 6, padding: '4px 12px', fontSize: 11, fontWeight: 600,
                       textDecoration: 'none',
                     }}>PDF</a>
                     <Link href={`/propuestas-cierre/${p.id}/editar`} style={{
-                      background: '#1D2D47', color: '#8A9BB8',
+                      background: '#F8FAFC', color: '#475569',
                       border: '1px solid rgba(255,255,255,0.08)',
                       borderRadius: 6, padding: '4px 12px', fontSize: 11, fontWeight: 600,
                       textDecoration: 'none',

@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { prisma } from '@/lib/prisma'
 import { formatCLP } from '@/lib/fmt'
+import { T } from '@/lib/theme'
 import { FlujoCajaChart } from '@/components/dashboard/FlujoCajaChart'
 import { PagosProximosWidget } from '@/components/dashboard/PagosProximosWidget'
 
@@ -22,8 +23,9 @@ export default async function DashboardPage() {
     }),
     prisma.transaction.findMany({
       where: { status: 'PENDIENTE', paymentDate: { lte: nextWeek } },
-      include: {
-        costCenter: { select: { code: true, name: true } },
+      select: {
+        id: true, description: true, gross: true, paymentDate: true,
+        costCenter: { select: { code: true } },
         provider: { select: { name: true } },
       },
       orderBy: { paymentDate: 'asc' },
@@ -42,26 +44,28 @@ export default async function DashboardPage() {
   const totalPagadoMes = Number(pagado._sum.gross ?? 0)
 
   return (
-    <div style={{ padding: 32 }}>
-      <h1 style={{ color: '#F0EDE8', fontSize: 22, fontWeight: 700, marginBottom: 24 }}>
+    <div style={{ padding: 28 }}>
+      <h1 style={{ color: T.textPrimary, fontSize: 22, fontWeight: 700, marginBottom: 24 }}>
         Dashboard
       </h1>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
         {[
-          { label: 'Pendiente por pagar', value: formatCLP(totalPendiente), color: '#D4A017' },
-          { label: 'Pagado este mes', value: formatCLP(totalPagadoMes), color: '#3D8B5E' },
-          { label: 'Balance YTD', value: formatCLP(ingresosYTD - egresosYTD), color: '#F0EDE8' },
+          { label: 'Pendiente por pagar', value: formatCLP(totalPendiente), color: T.warning },
+          { label: 'Pagado este mes', value: formatCLP(totalPagadoMes), color: T.success },
+          { label: 'Balance YTD', value: formatCLP(ingresosYTD - egresosYTD),
+            color: ingresosYTD - egresosYTD >= 0 ? T.success : T.danger },
         ].map(kpi => (
           <div key={kpi.label} style={{
-            background: '#162138', borderRadius: 12,
-            border: '1px solid rgba(255,255,255,0.08)', padding: '20px 24px',
+            background: T.card, borderRadius: 12,
+            border: `1px solid ${T.border}`, padding: '20px 24px',
+            boxShadow: '0 1px 2px rgba(15,26,46,0.04)',
           }}>
-            <div style={{ color: '#5A7090', fontSize: 11, fontWeight: 700,
+            <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700,
               textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
               {kpi.label}
             </div>
-            <div style={{ color: kpi.color, fontSize: 24, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+            <div style={{ color: kpi.color, fontSize: 26, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
               {kpi.value}
             </div>
           </div>

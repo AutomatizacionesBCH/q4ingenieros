@@ -33,7 +33,7 @@ export function DeleteMaestroButton({
   return (
     <button onClick={onClick} disabled={loading} title="Eliminar" style={{
       background: 'transparent', border: 'none',
-      color: loading ? '#5A7090' : '#8A9BB8',
+      color: loading ? '#94A3B8' : '#475569',
       fontSize: 14, cursor: loading ? 'wait' : 'pointer',
       padding: '2px 6px', lineHeight: 1,
     }}>×</button>

@@ -18,7 +18,7 @@ export function CeCoSelector({ cecos, current }: { cecos: Option[]; current: num
   return (
     <div style={{ flex: 1, maxWidth: 540 }}>
       <label style={{
-        display: 'block', color: '#5A7090', fontSize: 10, fontWeight: 700,
+        display: 'block', color: '#94A3B8', fontSize: 10, fontWeight: 700,
         letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6,
       }}>Centro de Costo</label>
       <select
@@ -27,11 +27,11 @@ export function CeCoSelector({ cecos, current }: { cecos: Option[]; current: num
         disabled={pending}
         style={{
           width: '100%',
-          background: '#0F1A2E',
+          background: '#F0F2F6',
           border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: 8,
           padding: '11px 14px',
-          color: '#F0EDE8',
+          color: '#0F1A2E',
           fontSize: 14,
           outline: 'none',
           opacity: pending ? 0.6 : 1,

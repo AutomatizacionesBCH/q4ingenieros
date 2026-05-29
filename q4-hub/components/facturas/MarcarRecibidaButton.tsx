@@ -33,8 +33,8 @@ export function MarcarRecibidaButton({ id, amount }: { id: number; amount: numbe
 
   return (
     <button onClick={onClick} disabled={loading} style={{
-      background: loading ? '#1D2D47' : 'rgba(61,139,94,0.15)',
-      color: '#3D8B5E',
+      background: loading ? '#F8FAFC' : '#F0FDF4',
+      color: '#16A34A',
       border: '1px solid rgba(61,139,94,0.3)',
       borderRadius: 6,
       padding: '4px 10px',

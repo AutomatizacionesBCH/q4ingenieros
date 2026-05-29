@@ -17,9 +17,9 @@ const LABEL: Record<Status, string> = {
 }
 
 const COLOR: Record<Status, { bg: string; fg: string; bd: string }> = {
-  BORRADOR: { bg: 'rgba(212,160,23,0.12)', fg: '#D4A017', bd: 'rgba(212,160,23,0.3)' },
-  ENVIADA:  { bg: 'rgba(61,139,94,0.15)',  fg: '#3D8B5E', bd: 'rgba(61,139,94,0.3)' },
-  ACEPTADA: { bg: 'transparent', fg: '#5A7090', bd: 'rgba(255,255,255,0.08)' },
+  BORRADOR: { bg: '#FEFCE8', fg: '#CA8A04', bd: '#FDE68A' },
+  ENVIADA:  { bg: '#F0FDF4',  fg: '#16A34A', bd: '#BBF7D0' },
+  ACEPTADA: { bg: 'transparent', fg: '#94A3B8', bd: '#E2E8F0' },
 }
 
 export function AvanzarEstadoButton({ id, currentStatus }: { id: number; currentStatus: Status }) {
@@ -54,7 +54,7 @@ export function AvanzarEstadoButton({ id, currentStatus }: { id: number; current
 
   return (
     <button onClick={onClick} disabled={loading} style={{
-      background: loading ? '#1D2D47' : c.bg,
+      background: loading ? '#F8FAFC' : c.bg,
       color: c.fg, border: `1px solid ${c.bd}`,
       borderRadius: 6, padding: '4px 10px',
       fontSize: 11, fontWeight: 700,

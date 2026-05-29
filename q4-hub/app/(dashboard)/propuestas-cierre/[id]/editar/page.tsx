@@ -36,10 +36,10 @@ export default async function EditarPropuestaPage({
   return (
     <div style={{ padding: 32, maxWidth: 1200 }}>
       <div style={{ marginBottom: 24 }}>
-        <Link href="/propuestas-cierre" style={{ color: '#8A9BB8', fontSize: 12, textDecoration: 'none' }}>
+        <Link href="/propuestas-cierre" style={{ color: '#475569', fontSize: 12, textDecoration: 'none' }}>
           ← Propuestas de Cierre
         </Link>
-        <h1 style={{ color: '#F0EDE8', fontSize: 22, fontWeight: 700, margin: '8px 0 0 0' }}>
+        <h1 style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: '8px 0 0 0' }}>
           Editar PC-{String(propuesta.id).padStart(4, '0')}
         </h1>
       </div>

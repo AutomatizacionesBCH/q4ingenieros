@@ -1,23 +1,16 @@
 'use client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useTransition, useEffect } from 'react'
+import { T } from '@/lib/theme'
 
 type Option = { id: number; label: string }
 
-const C = {
-  bg: '#0F1A2E',
-  border: 'rgba(255,255,255,0.08)',
-  text: '#F0EDE8',
-  dim: '#8A9BB8',
-  muted: '#5A7090',
-}
-
 const inputStyle: React.CSSProperties = {
-  background: C.bg,
-  border: `1px solid ${C.border}`,
+  background: T.field,
+  border: `1px solid ${T.border}`,
   borderRadius: 8,
   padding: '7px 10px',
-  color: C.text,
+  color: T.textPrimary,
   fontSize: 12,
   outline: 'none',
   width: '100%',
@@ -25,7 +18,7 @@ const inputStyle: React.CSSProperties = {
 }
 
 const labelStyle: React.CSSProperties = {
-  color: C.muted,
+  color: T.textMuted,
   fontSize: 10,
   fontWeight: 700,
   letterSpacing: '0.06em',
@@ -44,10 +37,8 @@ export function TransaccionesFilters({
   const router = useRouter()
   const params = useSearchParams()
   const [pending, startTransition] = useTransition()
-
   const [q, setQ] = useState(params.get('q') ?? '')
 
-  // Debounce search
   useEffect(() => {
     const current = params.get('q') ?? ''
     if (q === current) return
@@ -68,23 +59,19 @@ export function TransaccionesFilters({
     startTransition(() => router.push(`/transacciones?${next.toString()}`))
   }
   const get = (k: string) => params.get(k) ?? ''
-  const clear = () => {
-    setQ('')
-    startTransition(() => router.push('/transacciones'))
-  }
+  const clear = () => { setQ(''); startTransition(() => router.push('/transacciones')) }
 
   return (
     <div style={{
-      background: '#162138', borderRadius: 12,
-      border: `1px solid ${C.border}`, padding: 14, marginBottom: 14,
-      opacity: pending ? 0.7 : 1,
+      background: T.card, borderRadius: 12,
+      border: `1px solid ${T.border}`, padding: 14, marginBottom: 14,
+      opacity: pending ? 0.7 : 1, boxShadow: '0 1px 2px rgba(15,26,46,0.04)',
     }}>
       <div style={{ display: 'grid', gridTemplateColumns: '2fr repeat(6, 1fr) auto',
         gap: 10, alignItems: 'end' }}>
         <div>
           <label style={labelStyle}>Buscar</label>
-          <input style={inputStyle} value={q}
-            onChange={e => setQ(e.target.value)}
+          <input style={inputStyle} value={q} onChange={e => setQ(e.target.value)}
             placeholder="Descripción, factura, boleta..." />
         </div>
         <div>
@@ -141,7 +128,7 @@ export function TransaccionesFilters({
           </select>
         </div>
         <button onClick={clear} style={{
-          background: 'transparent', border: `1px solid ${C.border}`, color: C.dim,
+          background: T.card, border: `1px solid ${T.border}`, color: T.textSec,
           borderRadius: 8, padding: '7px 14px', fontSize: 12, cursor: 'pointer',
           height: 32,
         }}>Limpiar</button>

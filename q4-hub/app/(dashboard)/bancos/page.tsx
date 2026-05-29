@@ -40,9 +40,9 @@ export default async function BancosPage() {
     <div style={{ padding: 32 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <h1 style={{ color: '#F0EDE8', fontSize: 22, fontWeight: 700, margin: 0 }}>Bancos</h1>
-          <div style={{ color: '#8A9BB8', fontSize: 13, marginTop: 4 }}>
-            Saldo contable total: <span style={{ color: '#3D8B5E', fontWeight: 700 }}>{formatCLP(totalContable)}</span>
+          <h1 style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, margin: 0 }}>Bancos</h1>
+          <div style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>
+            Saldo contable total: <span style={{ color: '#16A34A', fontWeight: 700 }}>{formatCLP(totalContable)}</span>
           </div>
         </div>
         <RegistroSaldoForm companies={companies} />
@@ -56,14 +56,14 @@ export default async function BancosPage() {
           const filas = Array.from(latest.values()).filter(s => s.bank === bank && s.type === 'CONTABLE')
           return (
             <div key={bank} style={{
-              background: '#162138', borderRadius: 12,
+              background: '#FFFFFF', borderRadius: 12,
               border: '1px solid rgba(255,255,255,0.08)', padding: '16px 18px',
             }}>
-              <div style={{ color: '#5A7090', fontSize: 10, fontWeight: 700,
+              <div style={{ color: '#94A3B8', fontSize: 10, fontWeight: 700,
                 textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
                 {BANK_LABELS[bank]}
               </div>
-              <div style={{ color: total >= 0 ? '#F0EDE8' : '#C0392B', fontSize: 20, fontWeight: 700,
+              <div style={{ color: total >= 0 ? '#0F1A2E' : '#DC2626', fontSize: 20, fontWeight: 700,
                 fontVariantNumeric: 'tabular-nums', marginBottom: 10 }}>
                 {formatCLP(total)}
               </div>
@@ -71,13 +71,13 @@ export default async function BancosPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {filas.map(f => (
                     <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                      <span style={{ color: '#8A9BB8' }}>{f.company.name.split(' ')[0]}</span>
-                      <span style={{ color: '#F0EDE8', fontVariantNumeric: 'tabular-nums' }}>{formatCLP(Number(f.balance))}</span>
+                      <span style={{ color: '#475569' }}>{f.company.name.split(' ')[0]}</span>
+                      <span style={{ color: '#0F1A2E', fontVariantNumeric: 'tabular-nums' }}>{formatCLP(Number(f.balance))}</span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div style={{ color: '#5A7090', fontSize: 11, fontStyle: 'italic' }}>Sin registros</div>
+                <div style={{ color: '#94A3B8', fontSize: 11, fontStyle: 'italic' }}>Sin registros</div>
               )}
             </div>
           )
@@ -86,19 +86,19 @@ export default async function BancosPage() {
 
       {/* Histórico */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <h2 style={{ color: '#F0EDE8', fontSize: 14, fontWeight: 700, margin: 0,
+        <h2 style={{ color: '#0F1A2E', fontSize: 14, fontWeight: 700, margin: 0,
           textTransform: 'uppercase', letterSpacing: '0.06em' }}>Histórico</h2>
-        <span style={{ color: '#5A7090', fontSize: 11 }}>Últimos {saldos.length}</span>
+        <span style={{ color: '#94A3B8', fontSize: 11 }}>Últimos {saldos.length}</span>
       </div>
 
-      <div style={{ background: '#162138', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+      <div style={{ background: '#FFFFFF', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
               {['Fecha', 'Banco', 'Empresa', 'Tipo', 'Saldo', ''].map(h => (
                 <th key={h} style={{
                   padding: '12px 16px', textAlign: h === 'Saldo' ? 'right' : 'left',
-                  color: '#5A7090', fontSize: 11, fontWeight: 700,
+                  color: '#94A3B8', fontSize: 11, fontWeight: 700,
                   letterSpacing: '0.08em', textTransform: 'uppercase',
                 }}>{h}</th>
               ))}
@@ -108,23 +108,23 @@ export default async function BancosPage() {
             {saldos.map((s, i) => (
               <tr key={s.id} style={{
                 borderBottom: '1px solid rgba(255,255,255,0.04)',
-                background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
+                background: i % 2 === 0 ? 'transparent' : '#F8FAFC',
               }}>
-                <td style={{ padding: '10px 16px', color: '#8A9BB8', fontSize: 12, whiteSpace: 'nowrap' }}>
+                <td style={{ padding: '10px 16px', color: '#475569', fontSize: 12, whiteSpace: 'nowrap' }}>
                   {formatDate(s.recordedAt)}
                 </td>
-                <td style={{ padding: '10px 16px', color: '#F0EDE8', fontSize: 13, fontWeight: 600 }}>
+                <td style={{ padding: '10px 16px', color: '#0F1A2E', fontSize: 13, fontWeight: 600 }}>
                   {BANK_LABELS[s.bank] ?? s.bank}
                 </td>
-                <td style={{ padding: '10px 16px', color: '#8A9BB8', fontSize: 13 }}>{s.company.name}</td>
+                <td style={{ padding: '10px 16px', color: '#475569', fontSize: 13 }}>{s.company.name}</td>
                 <td style={{ padding: '10px 16px' }}>
                   <span style={{
-                    background: s.type === 'CONTABLE' ? 'rgba(61,139,94,0.15)' : 'rgba(212,160,23,0.15)',
-                    color: s.type === 'CONTABLE' ? '#3D8B5E' : '#D4A017',
+                    background: s.type === 'CONTABLE' ? '#F0FDF4' : '#FEFCE8',
+                    color: s.type === 'CONTABLE' ? '#16A34A' : '#CA8A04',
                     borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700,
                   }}>{s.type}</span>
                 </td>
-                <td style={{ padding: '10px 16px', textAlign: 'right', color: '#F0EDE8',
+                <td style={{ padding: '10px 16px', textAlign: 'right', color: '#0F1A2E',
                   fontSize: 14, fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>
                   {formatCLP(Number(s.balance))}
                 </td>
@@ -135,7 +135,7 @@ export default async function BancosPage() {
             ))}
             {saldos.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ padding: '32px 16px', textAlign: 'center', color: '#5A7090', fontSize: 13 }}>
+                <td colSpan={6} style={{ padding: '32px 16px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
                   Sin saldos bancarios registrados — usa el botón &ldquo;+ Registrar saldo&rdquo; arriba
                 </td>
               </tr>

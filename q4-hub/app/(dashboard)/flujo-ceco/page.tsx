@@ -30,10 +30,10 @@ export default async function FlujoCecoPage({
   if (!cecoId) {
     return (
       <div style={{ padding: 32 }}>
-        <h1 style={{ color: '#F0EDE8', fontSize: 22, fontWeight: 700, marginBottom: 4 }}>
+        <h1 style={{ color: '#0F1A2E', fontSize: 22, fontWeight: 700, marginBottom: 4 }}>
           Flujo por Centro de Costo
         </h1>
-        <div style={{ color: '#8A9BB8', fontSize: 13, marginBottom: 28 }}>
+        <div style={{ color: '#475569', fontSize: 13, marginBottom: 28 }}>
           Selecciona un CeCo para ver su flujo mensual, KPIs y todas sus transacciones
         </div>
         <CeCoSelector cecos={cecoOptions} current={null} />
@@ -48,7 +48,7 @@ export default async function FlujoCecoPage({
   if (!ceco) {
     return (
       <div style={{ padding: 32 }}>
-        <h1 style={{ color: '#F0EDE8', fontSize: 22 }}>CeCo no encontrado</h1>
+        <h1 style={{ color: '#0F1A2E', fontSize: 22 }}>CeCo no encontrado</h1>
         <Link href="/flujo-ceco" style={{ color: '#E5501E' }}>← Volver</Link>
       </div>
     )
@@ -92,22 +92,22 @@ export default async function FlujoCecoPage({
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 20, marginBottom: 16 }}>
         <CeCoSelector cecos={cecoOptions} current={cecoId} />
         <div style={{ paddingBottom: 4 }}>
-          <div style={{ color: '#5A7090', fontSize: 10, fontWeight: 700,
+          <div style={{ color: '#94A3B8', fontSize: 10, fontWeight: 700,
             textTransform: 'uppercase', letterSpacing: '0.08em' }}>Empresa</div>
-          <div style={{ color: '#F0EDE8', fontSize: 13, marginTop: 4 }}>{ceco.company.name}</div>
+          <div style={{ color: '#0F1A2E', fontSize: 13, marginTop: 4 }}>{ceco.company.name}</div>
         </div>
         {ceco.projectNumber && (
           <div style={{ paddingBottom: 4 }}>
-            <div style={{ color: '#5A7090', fontSize: 10, fontWeight: 700,
+            <div style={{ color: '#94A3B8', fontSize: 10, fontWeight: 700,
               textTransform: 'uppercase', letterSpacing: '0.08em' }}>N° Proyecto</div>
-            <div style={{ color: '#F0EDE8', fontSize: 13, marginTop: 4 }}>{ceco.projectNumber}</div>
+            <div style={{ color: '#0F1A2E', fontSize: 13, marginTop: 4 }}>{ceco.projectNumber}</div>
           </div>
         )}
         {ceco.location && (
           <div style={{ paddingBottom: 4 }}>
-            <div style={{ color: '#5A7090', fontSize: 10, fontWeight: 700,
+            <div style={{ color: '#94A3B8', fontSize: 10, fontWeight: 700,
               textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ubicación</div>
-            <div style={{ color: '#F0EDE8', fontSize: 13, marginTop: 4 }}>{ceco.location}</div>
+            <div style={{ color: '#0F1A2E', fontSize: 13, marginTop: 4 }}>{ceco.location}</div>
           </div>
         )}
       </div>
@@ -115,17 +115,17 @@ export default async function FlujoCecoPage({
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 20 }}>
         {[
-          { label: 'Total tx', value: total.toLocaleString('es-CL'), color: '#F0EDE8', plain: true },
-          { label: 'Ingresos (neto)', value: formatCLP(ingresos), color: '#3D8B5E' },
-          { label: 'Egresos (neto)', value: formatCLP(egresos), color: '#C0392B' },
-          { label: 'Balance', value: formatCLP(balance), color: balance >= 0 ? '#3D8B5E' : '#C0392B' },
-          { label: 'Pendiente pago', value: formatCLP(pendiente), color: '#D4A017' },
+          { label: 'Total tx', value: total.toLocaleString('es-CL'), color: '#0F1A2E', plain: true },
+          { label: 'Ingresos (neto)', value: formatCLP(ingresos), color: '#16A34A' },
+          { label: 'Egresos (neto)', value: formatCLP(egresos), color: '#DC2626' },
+          { label: 'Balance', value: formatCLP(balance), color: balance >= 0 ? '#16A34A' : '#DC2626' },
+          { label: 'Pendiente pago', value: formatCLP(pendiente), color: '#CA8A04' },
         ].map(k => (
           <div key={k.label} style={{
-            background: '#162138', borderRadius: 12,
+            background: '#FFFFFF', borderRadius: 12,
             border: '1px solid rgba(255,255,255,0.08)', padding: '14px 18px',
           }}>
-            <div style={{ color: '#5A7090', fontSize: 10, fontWeight: 700,
+            <div style={{ color: '#94A3B8', fontSize: 10, fontWeight: 700,
               textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{k.label}</div>
             <div style={{ color: k.color, fontSize: k.plain ? 22 : 18, fontWeight: 700,
               fontVariantNumeric: 'tabular-nums' }}>
@@ -137,18 +137,18 @@ export default async function FlujoCecoPage({
 
       {/* Resumen pagado vs total */}
       {pagado + pendiente > 0 && (
-        <div style={{ background: '#162138', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
+        <div style={{ background: '#FFFFFF', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
           padding: '14px 18px', marginBottom: 20 }}>
-          <div style={{ color: '#5A7090', fontSize: 10, fontWeight: 700,
+          <div style={{ color: '#94A3B8', fontSize: 10, fontWeight: 700,
             textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Estado de pagos</div>
-          <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 6, height: 12,
+          <div style={{ background: '#E2E8F0', borderRadius: 6, height: 12,
             overflow: 'hidden', display: 'flex' }}>
-            <div style={{ width: `${(pagado/(pagado+pendiente))*100}%`, background: '#3D8B5E' }} />
-            <div style={{ width: `${(pendiente/(pagado+pendiente))*100}%`, background: '#D4A017' }} />
+            <div style={{ width: `${(pagado/(pagado+pendiente))*100}%`, background: '#16A34A' }} />
+            <div style={{ width: `${(pendiente/(pagado+pendiente))*100}%`, background: '#CA8A04' }} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 11, color: '#8A9BB8' }}>
-            <span>✓ Pagado: <b style={{ color: '#3D8B5E' }}>{formatCLP(pagado)}</b></span>
-            <span>⏳ Pendiente: <b style={{ color: '#D4A017' }}>{formatCLP(pendiente)}</b></span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 11, color: '#475569' }}>
+            <span>✓ Pagado: <b style={{ color: '#16A34A' }}>{formatCLP(pagado)}</b></span>
+            <span>⏳ Pendiente: <b style={{ color: '#CA8A04' }}>{formatCLP(pendiente)}</b></span>
           </div>
         </div>
       )}
@@ -159,18 +159,18 @@ export default async function FlujoCecoPage({
 
       {/* Tabla tx */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <h2 style={{ color: '#F0EDE8', fontSize: 14, fontWeight: 700, margin: 0,
+        <h2 style={{ color: '#0F1A2E', fontSize: 14, fontWeight: 700, margin: 0,
           textTransform: 'uppercase', letterSpacing: '0.06em' }}>Transacciones</h2>
       </div>
 
-      <div style={{ background: '#162138', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'auto' }}>
+      <div style={{ background: '#FFFFFF', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1000 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
               {['Fecha', 'Descripción', 'Proveedor', 'Cuenta', 'Categoría', 'Tipo', 'Neto', 'Estado'].map(h => (
                 <th key={h} style={{
                   padding: '12px 14px', textAlign: h === 'Neto' ? 'right' : 'left',
-                  color: '#5A7090', fontSize: 11, fontWeight: 700,
+                  color: '#94A3B8', fontSize: 11, fontWeight: 700,
                   letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap',
                 }}>{h}</th>
               ))}
@@ -180,30 +180,30 @@ export default async function FlujoCecoPage({
             {txs.map((tx, i) => (
               <tr key={tx.id} style={{
                 borderBottom: '1px solid rgba(255,255,255,0.04)',
-                background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
+                background: i % 2 === 0 ? 'transparent' : '#F8FAFC',
               }}>
                 <td style={{ padding: '9px 14px', fontSize: 12, whiteSpace: 'nowrap' }}>
                   <Link href={`/transacciones/${tx.id}/editar`} style={{ color: '#E5501E', textDecoration: 'none' }}>
                     {formatDate(tx.paymentDate)}
                   </Link>
                 </td>
-                <td style={{ padding: '9px 14px', color: '#F0EDE8', fontSize: 13, maxWidth: 280,
+                <td style={{ padding: '9px 14px', color: '#0F1A2E', fontSize: 13, maxWidth: 280,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tx.description}>
                   {tx.description}
                 </td>
-                <td style={{ padding: '9px 14px', color: '#8A9BB8', fontSize: 12 }}>{tx.provider?.name ?? '—'}</td>
-                <td style={{ padding: '9px 14px', color: '#8A9BB8', fontSize: 12 }}>{tx.account?.code ?? '—'}</td>
-                <td style={{ padding: '9px 14px', color: '#5A7090', fontSize: 12 }}>{tx.category?.name ?? '—'}</td>
+                <td style={{ padding: '9px 14px', color: '#475569', fontSize: 12 }}>{tx.provider?.name ?? '—'}</td>
+                <td style={{ padding: '9px 14px', color: '#475569', fontSize: 12 }}>{tx.account?.code ?? '—'}</td>
+                <td style={{ padding: '9px 14px', color: '#94A3B8', fontSize: 12 }}>{tx.category?.name ?? '—'}</td>
                 <td style={{ padding: '9px 14px', fontSize: 11 }}>
                   <span style={{
-                    background: tx.movementType === 'INGRESO' ? 'rgba(61,139,94,0.18)' : 'rgba(192,57,43,0.18)',
-                    color: tx.movementType === 'INGRESO' ? '#3D8B5E' : '#C0392B',
+                    background: tx.movementType === 'INGRESO' ? '#F0FDF4' : 'rgba(192,57,43,0.18)',
+                    color: tx.movementType === 'INGRESO' ? '#16A34A' : '#DC2626',
                     borderRadius: 4, padding: '2px 8px', fontWeight: 700,
                   }}>{tx.movementType}</span>
                 </td>
                 <td style={{ padding: '9px 14px', fontSize: 13,
                   textAlign: 'right', fontVariantNumeric: 'tabular-nums',
-                  color: tx.movementType === 'INGRESO' ? '#3D8B5E' : '#F0EDE8' }}>
+                  color: tx.movementType === 'INGRESO' ? '#16A34A' : '#0F1A2E' }}>
                   {formatCLP(Number(tx.net))}
                 </td>
                 <td style={{ padding: '9px 14px' }}>
@@ -213,7 +213,7 @@ export default async function FlujoCecoPage({
             ))}
             {txs.length === 0 && (
               <tr>
-                <td colSpan={8} style={{ padding: '32px 14px', textAlign: 'center', color: '#5A7090', fontSize: 13 }}>
+                <td colSpan={8} style={{ padding: '32px 14px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
                   Sin transacciones en este CeCo
                 </td>
               </tr>
