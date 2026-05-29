@@ -1,37 +1,46 @@
 @import "tailwindcss";
 
 @theme {
-  --color-canvas:    #0F1A2E;
-  --color-surface:   #162138;
-  --color-surface-1: #1D2D47;
-  --color-surface-2: #243558;
+  --color-canvas:    #F0F2F6;
+  --color-surface:   #FFFFFF;
   --color-orange:    #E5501E;
-  --color-orange-hover: #F06030;
-  --color-navy:      #1C2D5A;
-  --color-primary:   #F0EDE8;
-  --color-secondary: #8A9BB8;
-  --color-muted:     #5A7090;
-  --color-success:   #3D8B5E;
-  --color-warning:   #D4A017;
-  --color-danger:    #C0392B;
-  --color-border:    rgba(255,255,255,0.08);
-  --color-border-strong: rgba(255,255,255,0.14);
+  --color-primary:   #0F1A2E;
+  --color-secondary: #475569;
+  --color-muted:     #94A3B8;
+  --color-success:   #16A34A;
+  --color-warning:   #CA8A04;
+  --color-danger:    #DC2626;
+  --color-border:    #E2E8F0;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, 'Cascadia Code', monospace;
 }
 
 * { box-sizing: border-box; }
 
+html {
+  background-color: #F0F2F6;
+}
+
 body {
   background-color: #F0F2F6;
   color: #0F1A2E;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
 }
 
 input, select, textarea, button {
   font-family: inherit;
-  font-size: 16px;  /* evita zoom en iOS al focus */
+}
+
+/* En mobile inputs grandes para tap accesible y evitar zoom iOS */
+@media (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px;
+  }
+  button {
+    cursor: pointer;
+  }
 }
 
 @media (min-width: 769px) {
@@ -44,9 +53,12 @@ input, select, textarea, button {
 
 /* ────────── Responsive utilities ────────── */
 
-/* MOBILE: padding reducido, grids a 1 columna, fuentes ligeramente más pequeñas */
+/* MOBILE */
 @media (max-width: 768px) {
   .q4-page {
+    padding: 0 !important;
+  }
+  .q4-content {
     padding: 14px !important;
   }
   .q4-header-row {
@@ -54,15 +66,12 @@ input, select, textarea, button {
     align-items: stretch !important;
     gap: 12px !important;
   }
-  .q4-header-row > * {
-    width: 100%;
-  }
   .q4-kpi-grid {
     grid-template-columns: 1fr 1fr !important;
     gap: 10px !important;
   }
   .q4-kpi-grid-3 {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: 1fr 1fr !important;
   }
   .q4-filter-grid,
   .q4-filter-grid-7 {
@@ -83,11 +92,6 @@ input, select, textarea, button {
   .q4-table {
     font-size: 12px !important;
   }
-  .q4-export-btns a {
-    flex: 1;
-    text-align: center;
-    padding: 9px 8px !important;
-  }
   .q4-h1 {
     font-size: 18px !important;
   }
@@ -107,6 +111,9 @@ input, select, textarea, button {
   .q4-detail-grid {
     grid-template-columns: 1fr 1fr !important;
   }
+  /* Esconde tabla desktop en mobile cuando hay versión cards */
+  .hide-mobile { display: none !important; }
+  .show-mobile { display: block !important; }
 }
 
 /* TABLET (769–1024) */
@@ -122,26 +129,48 @@ input, select, textarea, button {
   }
 }
 
-/* Scroll touch suave para tablas */
+@media (min-width: 769px) {
+  .show-mobile { display: none !important; }
+}
+
+/* Scroll touch */
 .q4-scroll-touch {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Targets de toque accesibles */
+/* Touch accesible */
 @media (max-width: 768px) {
   a, button {
     min-height: 36px;
   }
 }
 
-/* Ocultar scrollbar en mobile nav */
+/* Tap feedback */
+@media (max-width: 768px) {
+  a:active, button:active {
+    opacity: 0.7;
+    transition: opacity 0.05s;
+  }
+}
+
+/* Ocultar scrollbar en nav */
 nav::-webkit-scrollbar {
   display: none;
 }
 
-/* LayoutShell padding bottom para no tapar con la nav mobile */
+/* Padding bottom para no tapar con bottom nav mobile */
 @media (max-width: 768px) {
   main {
-    padding-bottom: 80px !important;
+    padding-bottom: calc(76px + env(safe-area-inset-bottom)) !important;
   }
+}
+
+/* Animaciones suaves */
+@keyframes q4-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.q4-fade-in {
+  animation: q4-fade-in 0.25s ease-out;
 }

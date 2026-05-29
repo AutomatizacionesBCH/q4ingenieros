@@ -13,6 +13,8 @@ import { EditableCell } from '@/components/inline/EditableCell'
 import { CecoAutocomplete } from '@/components/inline/CecoAutocomplete'
 import { ProveedorAutocomplete } from '@/components/inline/ProveedorAutocomplete'
 import { TableSkeleton } from '@/components/Skeleton'
+import { TxCardList } from '@/components/mobile/TxCardList'
+import { FAB } from '@/components/mobile/FAB'
 import { getCompanies, getCecos, getAccounts, getProviders } from '@/lib/maestros-cache'
 import type { Prisma } from '@prisma/client'
 
@@ -99,7 +101,13 @@ async function TablaProyecciones({ sp }: { sp: SP }) {
         ))}
       </div>
 
-      <div className="q4-table-wrap q4-scroll-touch" style={{
+      {/* Mobile: cards */}
+      <div className="show-mobile" style={{ display: 'none' }}>
+        <TxCardList items={pagos.map(p => ({ ...p, movementType: 'EGRESO' as const }))} showType={false} />
+      </div>
+
+      {/* Desktop: tabla */}
+      <div className="hide-mobile q4-table-wrap q4-scroll-touch" style={{
         background: T.card, borderRadius: 12, border: `1px solid ${T.border}`, overflow: 'auto',
         boxShadow: '0 1px 2px rgba(15,26,46,0.04)',
       }}>
@@ -231,31 +239,37 @@ export default async function ProyeccionesPage({
 
   return (
     <div className="q4-page" style={{ padding: 28 }}>
-      <div className="q4-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h1 className="q4-h1" style={{ color: T.textPrimary, fontSize: 22, fontWeight: 700, margin: 0 }}>Proyecciones</h1>
-          <div style={{ color: T.textSec, fontSize: 13, marginTop: 4 }}>
-            Rango: {formatDate(from)} → {formatDate(to)} · Click en cualquier celda para editar
+      <div className="q4-content">
+        <div className="q4-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h1 className="q4-h1" style={{ color: T.textPrimary, fontSize: 22, fontWeight: 700, margin: 0 }}>Proyecciones</h1>
+            <div style={{ color: T.textSec, fontSize: 12, marginTop: 4 }}>
+              {formatDate(from)} → {formatDate(to)}
+            </div>
+          </div>
+          <div className="hide-mobile q4-export-btns" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <ExportButtons tipo="proyecciones" />
+            <Link href={`/transacciones/nueva?movementType=EGRESO`} style={{
+              background: T.orange, color: '#fff', borderRadius: 8,
+              padding: '8px 16px', fontSize: 13, fontWeight: 600, textDecoration: 'none',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.06)', whiteSpace: 'nowrap',
+            }}>+ Nuevo egreso</Link>
           </div>
         </div>
-        <div className="q4-export-btns" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <ExportButtons tipo="proyecciones" />
-          <Link href={`/transacciones/nueva?movementType=EGRESO`} style={{
-            background: T.orange, color: '#fff', borderRadius: 8,
-            padding: '8px 16px', fontSize: 13, fontWeight: 600, textDecoration: 'none',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.06)', whiteSpace: 'nowrap',
-          }}>+ Nuevo egreso</Link>
-        </div>
+
+        <Suspense fallback={<div style={{ height: 75, background: T.card, borderRadius: 12,
+          border: `1px solid ${T.border}`, marginBottom: 14 }} />}>
+          <FiltrosWrapper />
+        </Suspense>
+
+        <Suspense fallback={<TableSkeleton rows={12} />}>
+          <TablaProyecciones sp={sp} />
+        </Suspense>
       </div>
 
-      <Suspense fallback={<div style={{ height: 75, background: T.card, borderRadius: 12,
-        border: `1px solid ${T.border}`, marginBottom: 14 }} />}>
-        <FiltrosWrapper />
-      </Suspense>
-
-      <Suspense fallback={<TableSkeleton rows={12} />}>
-        <TablaProyecciones sp={sp} />
-      </Suspense>
+      <div className="show-mobile" style={{ display: 'none' }}>
+        <FAB href="/transacciones/nueva?movementType=EGRESO" />
+      </div>
     </div>
   )
 }

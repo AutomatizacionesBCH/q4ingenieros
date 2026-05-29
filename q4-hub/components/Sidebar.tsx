@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { MobileBottomNav } from './mobile/MobileBottomNav'
 
 export const SIDEBAR_W = 240
 
@@ -32,35 +33,7 @@ export function Sidebar() {
   const isMobile = useIsMobile()
 
   if (isMobile) {
-    return (
-      <nav style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, height: 64,
-        background: C.bg, borderTop: `1px solid ${C.divider}`,
-        display: 'flex', overflowX: 'auto', overflowY: 'hidden',
-        zIndex: 200, WebkitOverflowScrolling: 'touch',
-        scrollbarWidth: 'none',
-      }}>
-        {MODULES.map(mod => {
-          const active = pathname === mod.href || pathname.startsWith(mod.href + '/')
-          return (
-            <Link key={mod.href} href={mod.href} style={{
-              minWidth: 72, display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', gap: 3,
-              textDecoration: 'none', padding: '6px 10px',
-              borderTop: `2px solid ${active ? C.border : 'transparent'}`,
-              background: active ? C.active : 'transparent',
-              flexShrink: 0,
-            }}>
-              <span style={{ fontSize: 18, opacity: active ? 1 : 0.5 }}>{mod.icon}</span>
-              <span style={{ fontSize: 9, fontWeight: active ? 700 : 500,
-                color: active ? C.text : C.dim, whiteSpace: 'nowrap' }}>
-                {mod.short}
-              </span>
-            </Link>
-          )
-        })}
-      </nav>
-    )
+    return <MobileBottomNav />
   }
 
   return (

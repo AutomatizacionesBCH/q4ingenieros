@@ -7,6 +7,16 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'sw
 export const metadata: Metadata = {
   title: 'Q4 Hub — Gestión Financiera',
   description: 'Sistema de gestión Nobarso / IDQ4',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Q4 Hub',
+  },
+  icons: {
+    icon: '/logo.jpeg',
+    apple: '/logo.jpeg',
+  },
 }
 
 export const viewport: Viewport = {
