@@ -74,7 +74,7 @@ export function Sidebar() {
           style={{ borderRadius: 6 }} priority />
         <div>
           <div style={{ color: C.text, fontSize: 13, fontWeight: 700 }}>Q4 Hub</div>
-          <div style={{ color: C.muted, fontSize: 10 }}>Novarso · IDQ4</div>
+          <div style={{ color: C.muted, fontSize: 10 }}>Nobarso · IDQ4</div>
         </div>
       </div>
 

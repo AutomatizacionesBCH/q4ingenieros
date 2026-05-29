@@ -32,7 +32,7 @@ export default function LoginPage() {
           <Image src="/logo.jpeg" alt="Q4" width={52} height={52}
             style={{ borderRadius: 10, marginBottom: 12 }} />
           <div style={{ color: '#F0EDE8', fontSize: 18, fontWeight: 700 }}>Q4 Hub</div>
-          <div style={{ color: '#5A7090', fontSize: 13, marginTop: 4 }}>Novarso · IDQ4</div>
+          <div style={{ color: '#5A7090', fontSize: 13, marginTop: 4 }}>Nobarso · IDQ4</div>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

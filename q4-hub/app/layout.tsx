@@ -6,7 +6,7 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'sw
 
 export const metadata: Metadata = {
   title: 'Q4 Hub — Gestión Financiera',
-  description: 'Sistema de gestión Novarso / IDQ4',
+  description: 'Sistema de gestión Nobarso / IDQ4',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

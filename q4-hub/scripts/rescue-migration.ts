@@ -50,7 +50,7 @@ const cleanRut = (v: unknown): string | null => {
 // Empresa según el Excel → company name canónico
 function mapEmpresa(raw: string): string {
   const l = raw.toLowerCase().trim()
-  if (l.includes('nobarzo') || l.includes('novarso')) return 'Novarso SpA'
+  if (l.includes('nobarzo') || l.includes('novarso') || l.includes('nobarso')) return 'Nobarso SpA'
   if (l.includes('q4')) return 'Q4 Ingenieros'
   if (l.includes('idq4')) return 'IDQ4 Construcciones'
   if (l.includes('transv')) return 'Transversales'
@@ -85,7 +85,7 @@ async function main() {
   console.log('\n3. Seed empresas…')
   const empMap = new Map<string, number>()
   for (const [name, rut, type] of [
-    ['Novarso SpA', '76000001-1', 'PRINCIPAL'],
+    ['Nobarso SpA', '76000001-1', 'PRINCIPAL'],
     ['Q4 Ingenieros', '76000004-4', 'PRINCIPAL'],
     ['IDQ4 Construcciones', '76000002-2', 'PRINCIPAL'],
     ['Transversales', '76000003-3', 'TRANSVERSAL'],
@@ -111,7 +111,7 @@ async function main() {
     const empresaRaw = String(row['Empresa'] ?? '').trim()
     if (!code || !name) continue
     const companyName = mapEmpresa(empresaRaw)
-    const companyId = empMap.get(companyName) ?? empMap.get('Novarso SpA')!
+    const companyId = empMap.get(companyName) ?? empMap.get('Nobarso SpA')!
     const projectNumber = row['N° Proyecto'] != null ? String(row['N° Proyecto']) : null
     const location = String(row['Ubicación'] ?? '').trim() || null
     await prisma.costCenter.upsert({
@@ -227,7 +227,7 @@ async function main() {
     try {
       const empresaRaw = String(row['Empresa'] ?? '').trim()
       const companyName = mapEmpresa(empresaRaw)
-      const companyId = empMap.get(companyName) ?? empMap.get('Novarso SpA')!
+      const companyId = empMap.get(companyName) ?? empMap.get('Nobarso SpA')!
 
       const cecoCode = String(row['Código ceco'] ?? '').trim()
       const costCenterId = cecoCode ? (cecoMap.get(cecoCode) ?? null) : null

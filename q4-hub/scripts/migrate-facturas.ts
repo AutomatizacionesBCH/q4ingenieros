@@ -48,7 +48,7 @@ async function main() {
   const companies = await prisma.company.findMany({ select: { id: true, name: true } })
   const empMap = new Map(companies.map(c => [c.name, c.id]))
   const q4Id = empMap.get('Q4 Ingenieros')!
-  const novarsoId = empMap.get('Novarso SpA')!
+  const nobarsoId = empMap.get('Nobarso SpA')!
 
   // ── CeCos por projectNumber para vincular ──
   const cecos = await prisma.costCenter.findMany({
@@ -71,7 +71,7 @@ async function main() {
     titleRow.forEach((cell, i) => {
       const s = String(cell ?? '').toUpperCase().trim()
       if (s.includes('Q4 INGENIEROS')) sections.push({ name: 'Q4 Ingenieros', startCol: i, empresaId: q4Id })
-      else if (s.includes('NOBARZO')) sections.push({ name: 'Novarso', startCol: i, empresaId: novarsoId })
+      else if (s.includes('NOBARZO')) sections.push({ name: 'Nobarso', startCol: i, empresaId: nobarsoId })
     })
   }
   console.log(`   Secciones detectadas: ${sections.map(s => `${s.name}@col${s.startCol}`).join(', ')}`)

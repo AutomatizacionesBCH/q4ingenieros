@@ -34,7 +34,7 @@ async function main() {
 
   // 1. Seed companies
   const companies = await Promise.all([
-    prisma.company.upsert({ where: { rut: '76000001-1' }, update: {}, create: { name: 'Novarso SpA', rut: '76000001-1', type: 'PRINCIPAL' } }),
+    prisma.company.upsert({ where: { rut: '76000001-1' }, update: {}, create: { name: 'Nobarso SpA', rut: '76000001-1', type: 'PRINCIPAL' } }),
     prisma.company.upsert({ where: { rut: '76000002-2' }, update: {}, create: { name: 'IDQ4 Construcciones', rut: '76000002-2', type: 'PRINCIPAL' } }),
     prisma.company.upsert({ where: { rut: '76000003-3' }, update: {}, create: { name: 'Transversales', rut: '76000003-3', type: 'TRANSVERSAL', splitRatio: 0.5 } }),
   ])

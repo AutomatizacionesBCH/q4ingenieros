@@ -21,7 +21,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       content: propuesta.content as Record<string, unknown>,
       createdAt: propuesta.createdAt.toISOString(),
     },
-    empresa: 'Novarso SpA',
+    empresa: 'Nobarso SpA',
   }) as unknown as ReactElement<DocumentProps, string | JSXElementConstructor<unknown>>
 
   const buffer = await renderToBuffer(element)
