@@ -1,5 +1,9 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
+
+# OpenSSL 3 también en el builder (Prisma lo necesita durante next build)
+RUN apk add --no-cache openssl
+
 COPY package*.json ./
 RUN npm ci
 COPY . .
@@ -14,6 +18,9 @@ RUN npx prisma generate
 # Verificación crítica: si el binario correcto no existe, el build falla aquí (no en producción)
 RUN ls node_modules/.prisma/client/ | grep "linux-musl-openssl-3.0.x" \
   || (echo "ERROR: Prisma binary linux-musl-openssl-3.0.x no fue generado. Verifica binaryTargets en schema.prisma" && exit 1)
+
+# Forzar binario correcto también durante el build (Next.js puede llamar a Prisma en SSG/SSR de páginas dinámicas)
+ENV PRISMA_QUERY_ENGINE_LIBRARY=/app/node_modules/.prisma/client/libquery_engine-linux-musl-openssl-3.0.x.so.node
 
 RUN npm run build
 

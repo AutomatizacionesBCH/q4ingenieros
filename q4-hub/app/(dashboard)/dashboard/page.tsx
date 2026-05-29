@@ -1,4 +1,4 @@
-export const revalidate = 10
+export const revalidate = 0
 
 import { prisma } from '@/lib/prisma'
 import { formatCLP } from '@/lib/fmt'
