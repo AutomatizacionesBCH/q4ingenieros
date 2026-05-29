@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
@@ -47,40 +47,4 @@ export default async function PlanCuentasPage() {
               <span style={{
                 background: account.movementType === 'INGRESO' ? '#F0FDF4' : '#FECACA',
                 color: account.movementType === 'INGRESO' ? '#16A34A' : '#DC2626',
-                fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
-              }}>
-                {account.movementType}
-              </span>
-              <span style={{ color: '#94A3B8', fontSize: 11, marginLeft: 'auto' }}>
-                {account._count.transactions.toLocaleString('es-CL')} tx
-              </span>
-              <Link href={`/plan-cuentas/${account.id}/editar`} style={{
-                background: '#F8FAFC', color: '#475569', border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 6, padding: '3px 10px', fontSize: 11, textDecoration: 'none',
-              }}>Editar</Link>
-              <DeleteMaestroButton url={`/api/maestros/cuentas/${account.id}`} label={`la cuenta ${account.code}`} />
-            </div>
-            {account.categories.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {account.categories.map(cat => (
-                  <span key={cat.id} style={{
-                    background: '#E2E8F0',
-                    color: '#475569', fontSize: 11, padding: '3px 10px', borderRadius: 4,
-                  }}>
-                    {cat.name}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-        {accounts.length === 0 && (
-          <div style={{ background: '#FFFFFF', borderRadius: 12,
-            border: '1px solid rgba(255,255,255,0.08)', padding: '48px 32px', textAlign: 'center' }}>
-            <div style={{ color: '#94A3B8', fontSize: 14 }}>Sin cuentas — usa &ldquo;+ Nueva cuenta&rdquo;</div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
+       

@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 import { prisma } from '@/lib/prisma'
 import { formatCLP, formatDate } from '@/lib/fmt'
@@ -68,81 +68,4 @@ export default async function BancosPage() {
                 {formatCLP(total)}
               </div>
               {filas.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {filas.map(f => (
-                    <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                      <span style={{ color: '#475569' }}>{f.company.name.split(' ')[0]}</span>
-                      <span style={{ color: '#0F1A2E', fontVariantNumeric: 'tabular-nums' }}>{formatCLP(Number(f.balance))}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ color: '#94A3B8', fontSize: 11, fontStyle: 'italic' }}>Sin registros</div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Histórico */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <h2 style={{ color: '#0F1A2E', fontSize: 14, fontWeight: 700, margin: 0,
-          textTransform: 'uppercase', letterSpacing: '0.06em' }}>Histórico</h2>
-        <span style={{ color: '#94A3B8', fontSize: 11 }}>Últimos {saldos.length}</span>
-      </div>
-
-      <div style={{ background: '#FFFFFF', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-              {['Fecha', 'Banco', 'Empresa', 'Tipo', 'Saldo', ''].map(h => (
-                <th key={h} style={{
-                  padding: '12px 16px', textAlign: h === 'Saldo' ? 'right' : 'left',
-                  color: '#94A3B8', fontSize: 11, fontWeight: 700,
-                  letterSpacing: '0.08em', textTransform: 'uppercase',
-                }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {saldos.map((s, i) => (
-              <tr key={s.id} style={{
-                borderBottom: '1px solid rgba(255,255,255,0.04)',
-                background: i % 2 === 0 ? 'transparent' : '#F8FAFC',
-              }}>
-                <td style={{ padding: '10px 16px', color: '#475569', fontSize: 12, whiteSpace: 'nowrap' }}>
-                  {formatDate(s.recordedAt)}
-                </td>
-                <td style={{ padding: '10px 16px', color: '#0F1A2E', fontSize: 13, fontWeight: 600 }}>
-                  {BANK_LABELS[s.bank] ?? s.bank}
-                </td>
-                <td style={{ padding: '10px 16px', color: '#475569', fontSize: 13 }}>{s.company.name}</td>
-                <td style={{ padding: '10px 16px' }}>
-                  <span style={{
-                    background: s.type === 'CONTABLE' ? '#F0FDF4' : '#FEFCE8',
-                    color: s.type === 'CONTABLE' ? '#16A34A' : '#CA8A04',
-                    borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700,
-                  }}>{s.type}</span>
-                </td>
-                <td style={{ padding: '10px 16px', textAlign: 'right', color: '#0F1A2E',
-                  fontSize: 14, fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>
-                  {formatCLP(Number(s.balance))}
-                </td>
-                <td style={{ padding: '10px 16px', textAlign: 'right' }}>
-                  <DeleteSaldoButton id={s.id} />
-                </td>
-              </tr>
-            ))}
-            {saldos.length === 0 && (
-              <tr>
-                <td colSpan={6} style={{ padding: '32px 16px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
-                  Sin saldos bancarios registrados — usa el botón &ldquo;+ Registrar saldo&rdquo; arriba
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
+                <div style={{ display: 'flex', flexDirection: 'column
