@@ -7,11 +7,12 @@ import { useUmbral } from './useUmbral'
 type Week = { weekLabel: string; weekStartISO: string; running: number }
 
 export function AlertaFlujoPanel({
-  projected, saldoActual, unscheduledEgresoCount,
+  projected, saldoActual, unscheduledEgresoCount, saldoRegistrado = true,
 }: {
   projected: Week[]
   saldoActual: number
   unscheduledEgresoCount: number
+  saldoRegistrado?: boolean
 }) {
   const { umbral, setUmbral, mounted } = useUmbral()
   const [draft, setDraft] = useState<string>('')
@@ -38,6 +39,9 @@ export function AlertaFlujoPanel({
   const breach = projected.find(w => w.running < umbral) ?? null
   const breachCount = projected.filter(w => w.running < umbral).length
   const healthy = breach == null
+  // Without registered bank balances the projection starts from $0 — a breach here would be
+  // a false alarm (unknown cash, not low cash), so show an informational state instead.
+  const noSaldo = !saldoRegistrado
 
   const save = () => {
     const n = Number(draft.replace(/[^\d.-]/g, ''))
@@ -53,23 +57,33 @@ export function AlertaFlujoPanel({
       </div>
 
       {/* Status chip */}
-      <div style={{
-        background: healthy ? T.successBg : T.dangerBg,
-        border: `1px solid ${healthy ? T.successBorder : T.dangerBorder}`,
-        borderRadius: 10, padding: '12px 14px',
-      }}>
-        <div style={{ color: healthy ? T.success : T.danger, fontSize: 14, fontWeight: 700 }}>
-          {healthy ? '✓ Flujo saludable' : `⚠ Flujo bajo umbral`}
+      {noSaldo ? (
+        <div style={{ background: T.neutralBg, border: `1px solid ${T.border}`, borderRadius: 10, padding: '12px 14px' }}>
+          <div style={{ color: T.textPrimary, fontSize: 14, fontWeight: 700 }}>Proyección sin saldo base</div>
+          <div style={{ color: T.textSec, fontSize: 12, marginTop: 4 }}>
+            Registra los saldos bancarios en <strong>Bancos</strong> para activar la alerta.
+            Por ahora la proyección parte desde $0 y solo muestra los movimientos pendientes.
+          </div>
         </div>
-        <div style={{ color: T.textSec, fontSize: 12, marginTop: 4 }}>
-          {healthy
-            ? `El saldo proyectado se mantiene sobre ${formatCLP(umbral)} en las próximas 8 semanas.`
-            : `Cae bajo el umbral en ${breachCount} semana${breachCount === 1 ? '' : 's'}.`}
+      ) : (
+        <div style={{
+          background: healthy ? T.successBg : T.dangerBg,
+          border: `1px solid ${healthy ? T.successBorder : T.dangerBorder}`,
+          borderRadius: 10, padding: '12px 14px',
+        }}>
+          <div style={{ color: healthy ? T.success : T.danger, fontSize: 14, fontWeight: 700 }}>
+            {healthy ? '✓ Flujo saludable' : `⚠ Flujo bajo umbral`}
+          </div>
+          <div style={{ color: T.textSec, fontSize: 12, marginTop: 4 }}>
+            {healthy
+              ? `El saldo proyectado se mantiene sobre ${formatCLP(umbral)} en las próximas 8 semanas.`
+              : `Cae bajo el umbral en ${breachCount} semana${breachCount === 1 ? '' : 's'}.`}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Earliest breach detail */}
-      {!healthy && breach && (
+      {!noSaldo && !healthy && breach && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ color: T.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Primera semana crítica

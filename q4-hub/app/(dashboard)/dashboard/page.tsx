@@ -5,7 +5,7 @@ import { T } from '@/lib/theme'
 import { getCompanies } from '@/lib/maestros-cache'
 import {
   monthBounds, getSaldoDisponible, getPeriodTotals,
-  getProjectedFlow, getPagosSemana, getEvolucionSemanal, getEvolucionMensual,
+  getProjectedFlow, accumulateProjection, getPagosSemana, getEvolucionSemanal, getEvolucionMensual,
   getDesglosePorEmpresa,
 } from '@/lib/dashboard-data'
 import { DashboardFilters } from '@/components/dashboard/DashboardFilters'
@@ -30,21 +30,22 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const status = sp.status || undefined
   const mb = monthBounds(sp.month)
 
-  // saldo first — it seeds the forward-flow projection's starting balance
-  const saldoInfo = await getSaldoDisponible(companyId)
-
-  const [curr, prev, projected, pagos, evoSemanal, evoMensual, desglose] = await Promise.all([
+  // All queries run in parallel; the projection's running balance is layered on after.
+  const [saldoInfo, curr, prev, proj, pagos, evoSemanal, evoMensual, desglose] = await Promise.all([
+    getSaldoDisponible(companyId),
     getPeriodTotals(mb.start, mb.end, companyId, status),
     getPeriodTotals(mb.prevStart, mb.prevEnd, companyId, status),
-    getProjectedFlow(saldoInfo.saldo, companyId),
+    getProjectedFlow(companyId),
     getPagosSemana(companyId),
     getEvolucionSemanal(companyId, status),
     getEvolucionMensual(companyId, status),
     getDesglosePorEmpresa(mb.start, mb.end, status),
   ])
 
+  const projected = accumulateProjection(saldoInfo.saldo, proj.rawWeeks)
+  const saldoRegistrado = saldoInfo.saldoFecha !== null
   const selectedCompany = companyId ? desglose.rows.find(r => r.companyId === companyId) : null
-  const scopeLabel = selectedCompany ? selectedCompany.name : 'Grupo (Nobarzo + Q4 + Transversal)'
+  const scopeLabel = selectedCompany ? selectedCompany.name : 'Grupo consolidado'
 
   return (
     <div className="q4-page" style={{ padding: 28 }}>
@@ -70,7 +71,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <AlertaFlujoPanel
             projected={projected.weeks}
             saldoActual={saldoInfo.saldo}
-            unscheduledEgresoCount={projected.unscheduledEgresoCount}
+            saldoRegistrado={saldoRegistrado}
+            unscheduledEgresoCount={proj.unscheduledEgresoCount}
           />
         </div>
 
@@ -89,7 +91,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             title="Pagos pendientes · semana en curso"
             total={pagos.total}
             emptyLabel="Sin pagos pendientes esta semana ✓"
-            unscheduledCount={projected.unscheduledEgresoCount}
+            unscheduledCount={proj.unscheduledEgresoCount}
           />
           <EvolucionSemanalChart data={evoSemanal} />
         </div>
