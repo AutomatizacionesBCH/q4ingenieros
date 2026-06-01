@@ -6,18 +6,20 @@ import { T } from '@/lib/theme'
 type Option = { id: number; name: string }
 
 export function ProveedorAutocomplete({
-  txId, currentName, currentId, providers,
+  txId, currentName, currentId, providers, endpoint,
 }: {
   txId: number
   currentName: string | null
   currentId: number | null
   providers: Option[]
+  endpoint?: string // default: /api/transacciones/{txId}
 }) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [q, setQ] = useState(currentName ?? '')
   const [saving, setSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const url = endpoint ?? `/api/transacciones/${txId}`
 
   useEffect(() => {
     if (editing && inputRef.current) {
@@ -31,7 +33,7 @@ export function ProveedorAutocomplete({
     if (providerId === currentId) { setEditing(false); return }
     setSaving(true)
     try {
-      const res = await fetch(`/api/transacciones/${txId}`, {
+      const res = await fetch(url, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ providerId }),

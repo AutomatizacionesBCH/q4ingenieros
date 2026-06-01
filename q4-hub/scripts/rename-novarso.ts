@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma'
 async function main() {
   const result = await prisma.company.updateMany({
     where: { name: { contains: 'Novarso', mode: 'insensitive' } },
-    data: { name: 'Nobarso SpA' },
+    data: { name: 'Nobarzo SpA' },
   })
   console.log(`Actualizadas ${result.count} empresa(s)`)
 

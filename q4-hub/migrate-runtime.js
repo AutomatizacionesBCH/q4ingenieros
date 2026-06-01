@@ -24,6 +24,16 @@ const SQL = [
   `ALTER TABLE "PurchaseOrder" ADD COLUMN IF NOT EXISTS "condicionPago" TEXT`,
   `ALTER TABLE "PurchaseOrder" ADD COLUMN IF NOT EXISTS "tipoMoneda" "Currency" NOT NULL DEFAULT 'CLP'`,
   `ALTER TABLE "PurchaseOrder" ADD COLUMN IF NOT EXISTS "retencion" DECIMAL(14, 2)`,
+
+  // Eliminar IDQ4 (no existe como empresa) — solo si no tiene datos asociados (idempotente y seguro).
+  `DELETE FROM "Company" c
+   WHERE c."rut" = '76000002-2'
+     AND NOT EXISTS (SELECT 1 FROM "Transaction"   t WHERE t."companyId" = c."id")
+     AND NOT EXISTS (SELECT 1 FROM "CostCenter"    cc WHERE cc."companyId" = c."id")
+     AND NOT EXISTS (SELECT 1 FROM "IssuedInvoice" i WHERE i."companyId" = c."id")
+     AND NOT EXISTS (SELECT 1 FROM "PurchaseOrder" p WHERE p."companyId" = c."id")
+     AND NOT EXISTS (SELECT 1 FROM "BankBalance"   b WHERE b."companyId" = c."id")
+     AND NOT EXISTS (SELECT 1 FROM "User"          u WHERE u."companyId" = c."id")`,
 ]
 
 async function main() {

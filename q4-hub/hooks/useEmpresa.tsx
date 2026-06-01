@@ -1,7 +1,7 @@
 'use client'
 import { createContext, useContext, useState, ReactNode } from 'react'
 
-type Empresa = 'NOBARZO' | 'IDQ4' | 'TODAS'
+type Empresa = 'NOBARZO' | 'Q4' | 'TODAS'
 
 interface EmpresaCtx { empresa: Empresa; setEmpresa: (e: Empresa) => void }
 

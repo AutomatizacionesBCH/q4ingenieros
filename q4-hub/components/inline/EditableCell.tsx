@@ -20,6 +20,7 @@ type Props = {
   color?: string
   fontWeight?: number
   endpoint?: string  // default: /api/transacciones/{txId}
+  stringValue?: boolean  // kind='select': keep value as string (enums) instead of Number
 }
 
 const cellBase: React.CSSProperties = {
@@ -36,7 +37,7 @@ const cellBase: React.CSSProperties = {
 export function EditableCell({
   txId, field, kind, value, display, options,
   align = 'left', width, fontFamily, color = T.textPrimary, fontWeight = 400,
-  endpoint,
+  endpoint, stringValue = false,
 }: Props) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
@@ -66,10 +67,12 @@ export function EditableCell({
 
     setSaving(true)
     let payload: string | number | null = newRaw
-    if (kind === 'number' || kind === 'money' || kind === 'select') {
+    if (kind === 'number' || kind === 'money') {
+      payload = newRaw === '' ? null : Number(newRaw)
+      if (Number.isNaN(payload as number)) payload = null
+    } else if (kind === 'select') {
       if (newRaw === '') payload = null
-      else payload = kind === 'select' ? Number(newRaw) : Number(newRaw)
-      if (kind !== 'select' && Number.isNaN(payload as number)) payload = null
+      else payload = stringValue ? newRaw : Number(newRaw)
     }
     if (kind === 'date' && newRaw === '') payload = null
     if (kind === 'text' && newRaw === '') payload = null

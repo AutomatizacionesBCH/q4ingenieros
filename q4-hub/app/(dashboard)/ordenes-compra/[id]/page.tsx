@@ -69,6 +69,10 @@ export default async function OCDetallePage({
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
+          <a href={`/api/pdf/oc/${oc.id}`} target="_blank" rel="noopener noreferrer" style={{
+            background: '#0F1A2E', color: '#fff', border: 'none',
+            borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 600, textDecoration: 'none',
+          }}>↓ Generar PDF</a>
           <CerrarOCButton id={oc.id} currentStatus={oc.status} />
           <Link href={`/ordenes-compra/${oc.id}/editar`} style={{
             background: '#F8FAFC', color: '#475569', border: '1px solid rgba(255,255,255,0.08)',
