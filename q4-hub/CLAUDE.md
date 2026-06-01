@@ -39,7 +39,27 @@
 - `revalidate = 0` en todas las pages (sin SSG)
 - Serializar Decimal → Number y Date → ISO string antes de pasar a client components
 - Filtros client-side: pasar datos al cliente y filtrar con useMemo (sin extra fetch)
+- Filtros server-side (dashboard): vía URL searchParams leídos en el server component
+  (NO usar el contexto useEmpresa para filtrar queries — no está cableado server-side)
+- Fechas: `paymentDate`/`issueDate`/etc. son `@db.Date` (medianoche UTC). Para bucketing
+  por semana/mes usar SIEMPRE getters UTC (Date.UTC / getUTCDate). `formatDate` ya fija
+  `timeZone: 'UTC'` para evitar off-by-one y hydration mismatch.
+- Charts Recharts: 'use client', alimentados por props computadas en el server (nunca
+  self-fetch que ignore los filtros)
 - Móvil: bottom nav + drawer + cards en vez de tabla para módulos principales
+
+## Dashboard
+- Lógica de datos centralizada en `lib/dashboard-data.ts` (server-only, sin JSX):
+  getSaldoDisponible, getPeriodTotals, getProjectedFlow, getPagosSemana,
+  getEvolucionSemanal, getEvolucionMensual, getDesglosePorEmpresa, monthBounds, getWeekRange.
+- Dinero: NET para P&L/evolución/comparativa; GROSS para caja (pagos, proyección).
+  NULO excluido por defecto vía statusWhere().
+- Saldo disponible = suma del último BankBalance CONTABLE por (banco, empresa).
+- Umbral de alerta de flujo: localStorage key `q4:flujoUmbral` (default 10.000.000),
+  hook `components/dashboard/useUmbral.ts`, sincronizado entre chart y panel vía
+  evento window `q4-umbral-change`. NO hay tabla de settings (cero migración).
+- Nota: `app/(dashboard)/proyecciones/page.tsx` tiene su propio getWeekRange en hora
+  LOCAL (bug de TZ latente, mismo patrón que se corrigió en el dashboard) — pendiente.
 
 ## Campos OC (PurchaseOrder)
 Campos actuales: id, companyId, company, costCenterId, costCenter, providerId, provider,
@@ -54,3 +74,6 @@ name, rut, email, phone, address, city, contactName
 - 2026-05-31: Buscador+filtros en Facturas Emitidas (FacturasFilters.tsx)
 - 2026-05-31: Generador PDF Órdenes de Compra (OrdenCompraPDF.tsx + /api/pdf/oc/[id])
 - 2026-05-31: Formulario OC ampliado (solicitadoPor, gerencia, cotizacionNum, etc.)
+- 2026-06-01: Dashboard rediseñado (consolidado Grupo + por empresa, flujo proyectado
+  con alerta de umbral, evolución semanal/mensual, filtros empresa/mes/estado).
+  Bucketing de fechas migrado a UTC; formatDate fija timeZone UTC.
