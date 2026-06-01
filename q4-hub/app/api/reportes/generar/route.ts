@@ -9,7 +9,7 @@ import { ReportPDF, type ReportColumn, type ReportData } from '@/components/repo
 import type { Prisma } from '@prisma/client'
 
 type Tipo = 'transacciones' | 'proyecciones' | 'ceco'
-type Formato = 'pdf' | 'excel'
+type Formato = 'pdf' | 'excel' | 'json'
 
 function buildWhere(sp: URLSearchParams, defaults: Prisma.TransactionWhereInput = {}): Prisma.TransactionWhereInput {
   const where: Prisma.TransactionWhereInput = { ...defaults }
@@ -248,6 +248,17 @@ export async function GET(req: Request) {
 
   try {
     const data = await buildReportData(tipo, searchParams)
+
+    if (formato === 'json') {
+      // Vista previa en pantalla: limita filas para no saturar el navegador.
+      const MAX_PREVIEW = 500
+      return NextResponse.json({
+        ...data,
+        totalRows: data.rows.length,
+        rows: data.rows.slice(0, MAX_PREVIEW),
+        truncated: data.rows.length > MAX_PREVIEW,
+      })
+    }
 
     if (formato === 'excel') {
       const wb = XLSX.utils.book_new()

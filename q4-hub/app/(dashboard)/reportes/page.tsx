@@ -33,8 +33,8 @@ export default async function ReportesPage() {
 
       <Generador
         companies={companies.map(c => ({ id: c.id, label: c.name }))}
-        cecos={cecos.map(c => ({ id: c.id, label: `${c.code} · ${c.name}` }))}
-        accounts={accounts.map(a => ({ id: a.id, label: `${a.code} · ${a.name}` }))}
+        cecos={cecos.map(c => ({ id: c.id, label: `${c.code} · ${c.name}`, companyId: c.companyId }))}
+        accounts={accounts.map(a => ({ id: a.id, label: `${a.code} · ${a.name}`, movementType: a.movementType }))}
       />
 
       {/* Estado de Resultados YTD por empresa */}

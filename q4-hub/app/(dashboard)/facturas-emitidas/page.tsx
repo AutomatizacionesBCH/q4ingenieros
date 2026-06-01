@@ -3,15 +3,20 @@ export const revalidate = 0
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { FacturasFilters } from '@/components/facturas/FacturasFilters'
+import { getCompanies, getCecos } from '@/lib/maestros-cache'
 
 export default async function FacturasEmitidasPage() {
-  const raw = await prisma.issuedInvoice.findMany({
-    include: {
-      company: { select: { name: true } },
-      costCenter: { select: { code: true, name: true } },
-    },
-    orderBy: [{ issueDate: 'desc' }, { createdAt: 'desc' }],
-  })
+  const [raw, companies, cecos] = await Promise.all([
+    prisma.issuedInvoice.findMany({
+      include: {
+        company: { select: { name: true } },
+        costCenter: { select: { code: true, name: true } },
+      },
+      orderBy: [{ issueDate: 'desc' }, { createdAt: 'desc' }],
+    }),
+    getCompanies(),
+    getCecos(),
+  ])
 
   // Serializar Decimal → number y Date → ISO string para el client component
   const facturas = raw.map(f => ({
@@ -44,7 +49,11 @@ export default async function FacturasEmitidasPage() {
         }}>+ Nueva factura</Link>
       </div>
 
-      <FacturasFilters facturas={facturas} />
+      <FacturasFilters
+        facturas={facturas}
+        allCompanies={companies.map(c => ({ id: c.id, name: c.name }))}
+        allCecos={cecos.map(c => ({ id: c.id, code: c.code, name: c.name }))}
+      />
     </div>
   )
 }

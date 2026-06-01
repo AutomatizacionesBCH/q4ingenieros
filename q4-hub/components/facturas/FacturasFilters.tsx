@@ -1,8 +1,9 @@
 'use client'
 import { useState, useMemo } from 'react'
-import Link from 'next/link'
 import { formatCLP, formatDate } from '@/lib/fmt'
 import { MarcarRecibidaButton } from './MarcarRecibidaButton'
+import { EditableCell } from '@/components/inline/EditableCell'
+import { CecoAutocomplete } from '@/components/inline/CecoAutocomplete'
 
 export type FacturaRow = {
   id: number
@@ -38,7 +39,18 @@ const INPUT_STYLE: React.CSSProperties = {
   boxSizing: 'border-box',
 }
 
-export function FacturasFilters({ facturas }: { facturas: FacturaRow[] }) {
+const ESTADO_OPTS = [
+  { value: 'PENDIENTE', label: 'PENDIENTE' },
+  { value: 'PAGADO', label: 'PAGADO' },
+  { value: 'NULO', label: 'NULO' },
+]
+
+export function FacturasFilters({ facturas, allCompanies = [], allCecos = [] }: {
+  facturas: FacturaRow[]
+  allCompanies?: { id: number; name: string }[]
+  allCecos?: { id: number; code: string; name: string }[]
+}) {
+  const companyOpts = allCompanies.map(c => ({ value: c.id, label: c.name }))
   const [search, setSearch] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -244,49 +256,68 @@ export function FacturasFilters({ facturas }: { facturas: FacturaRow[] }) {
           <tbody>
             {filtered.map((f, i) => {
               const pendiente = f.amount - f.received
+              const ep = `/api/facturas-emitidas/${f.id}`
               return (
                 <tr key={f.id} style={{
                   borderBottom: '1px solid rgba(255,255,255,0.04)',
                   background: i % 2 === 0 ? 'transparent' : '#F8FAFC',
                 }}>
-                  <td style={{ padding: '9px 14px', fontSize: 12, whiteSpace: 'nowrap' }}>
-                    <Link href={`/facturas-emitidas/${f.id}/editar`} style={{ color: '#E5501E', textDecoration: 'none' }}>
-                      {formatDate(f.issueDate)}
-                    </Link>
+                  <td style={{ padding: '2px 8px', fontSize: 12, whiteSpace: 'nowrap' }}>
+                    <EditableCell txId={f.id} field="issueDate" kind="date" endpoint={ep}
+                      value={f.issueDate ? f.issueDate.slice(0, 10) : ''}
+                      display={<span style={{ color: '#E5501E' }}>{formatDate(f.issueDate)}</span>} />
                   </td>
-                  <td style={{ padding: '9px 14px', color: '#E5501E', fontSize: 12, fontFamily: 'monospace' }}>
-                    {f.epNumber ?? '—'}
+                  <td style={{ padding: '2px 8px' }}>
+                    <EditableCell txId={f.id} field="epNumber" kind="text" endpoint={ep}
+                      value={f.epNumber ?? ''}
+                      display={<span style={{ color: '#E5501E', fontSize: 12, fontFamily: 'monospace' }}>{f.epNumber ?? '—'}</span>} />
                   </td>
-                  <td style={{ padding: '9px 14px', color: '#0F1A2E', fontSize: 13 }}>
-                    {f.invoiceNumber ?? '—'}
+                  <td style={{ padding: '2px 8px' }}>
+                    <EditableCell txId={f.id} field="invoiceNumber" kind="text" endpoint={ep}
+                      value={f.invoiceNumber ?? ''}
+                      display={<span style={{ color: '#0F1A2E', fontSize: 13 }}>{f.invoiceNumber ?? '—'}</span>} />
                   </td>
-                  <td style={{ padding: '9px 14px', color: '#475569', fontSize: 12 }}>
-                    {f.company.name.split(' ')[0]}
+                  <td style={{ padding: '2px 8px', minWidth: 120 }}>
+                    <EditableCell txId={f.id} field="companyId" kind="select" endpoint={ep}
+                      value={f.companyId} options={companyOpts}
+                      display={<span style={{ color: '#475569', fontSize: 12 }}>{f.company.name.split(' ')[0]}</span>} />
                   </td>
-                  <td style={{ padding: '9px 14px', color: '#E5501E', fontSize: 12, fontFamily: 'monospace' }}>
-                    {f.costCenter?.code ?? '—'}
+                  <td style={{ padding: '2px 8px' }}>
+                    <CecoAutocomplete txId={f.id} endpoint={ep}
+                      currentCode={f.costCenter?.code ?? null} currentId={f.costCenterId ?? null} cecos={allCecos} />
                   </td>
-                  <td style={{ padding: '9px 14px', textAlign: 'right', color: '#0F1A2E', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
-                    {formatCLP(f.amount)}
+                  <td style={{ padding: '2px 8px', textAlign: 'right' }}>
+                    <EditableCell txId={f.id} field="amount" kind="money" endpoint={ep} align="right"
+                      value={f.amount}
+                      display={<span style={{ color: '#0F1A2E', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>{formatCLP(f.amount)}</span>} />
                   </td>
-                  <td style={{ padding: '9px 14px', textAlign: 'right', fontSize: 13, fontVariantNumeric: 'tabular-nums', color: pendiente <= 0 ? '#16A34A' : '#CA8A04' }}>
-                    {formatCLP(f.received)}
-                    {pendiente > 0 && (
-                      <div style={{ fontSize: 10, color: '#94A3B8' }}>falta {formatCLP(pendiente)}</div>
-                    )}
+                  <td style={{ padding: '2px 8px', textAlign: 'right' }}>
+                    <EditableCell txId={f.id} field="received" kind="money" endpoint={ep} align="right"
+                      value={f.received}
+                      display={
+                        <span style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums', color: pendiente <= 0 ? '#16A34A' : '#CA8A04' }}>
+                          {formatCLP(f.received)}
+                          {pendiente > 0 && <span style={{ fontSize: 10, color: '#94A3B8', marginLeft: 4 }}>falta {formatCLP(pendiente)}</span>}
+                        </span>
+                      } />
                   </td>
-                  <td style={{ padding: '9px 14px' }}>
-                    <span style={{
-                      background: STATUS_COLORS[f.status] + '22',
-                      color: STATUS_COLORS[f.status],
-                      borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700,
-                    }}>{f.status}</span>
-                    {f.factoring && (
-                      <span style={{
-                        background: 'rgba(229,80,30,0.15)', color: '#E5501E',
-                        borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700, marginLeft: 4,
-                      }}>FACT</span>
-                    )}
+                  <td style={{ padding: '2px 8px' }}>
+                    <EditableCell txId={f.id} field="status" kind="select" endpoint={ep} stringValue
+                      value={f.status} options={ESTADO_OPTS}
+                      display={
+                        <span>
+                          <span style={{
+                            background: STATUS_COLORS[f.status] + '22', color: STATUS_COLORS[f.status],
+                            borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700,
+                          }}>{f.status}</span>
+                          {f.factoring && (
+                            <span style={{
+                              background: 'rgba(229,80,30,0.15)', color: '#E5501E',
+                              borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700, marginLeft: 4,
+                            }}>FACT</span>
+                          )}
+                        </span>
+                      } />
                   </td>
                   <td style={{ padding: '9px 14px', textAlign: 'right' }}>
                     {f.status !== 'PAGADO' && (
