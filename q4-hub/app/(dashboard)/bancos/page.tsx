@@ -4,10 +4,18 @@ import { prisma } from '@/lib/prisma'
 import { formatCLP, formatDate } from '@/lib/fmt'
 import { RegistroSaldoForm } from '@/components/bancos/RegistroSaldoForm'
 import { DeleteSaldoButton } from '@/components/bancos/DeleteSaldoButton'
+import { EditableCell } from '@/components/inline/EditableCell'
 
 const BANK_LABELS: Record<string, string> = {
   CHILE: 'Banco de Chile', BCI: 'BCI', ITAU: 'Itaú', SANTANDER: 'Santander',
 }
+const BANK_OPTS = [
+  { value: 'CHILE', label: 'Banco de Chile' }, { value: 'BCI', label: 'BCI' },
+  { value: 'ITAU', label: 'Itaú' }, { value: 'SANTANDER', label: 'Santander' },
+]
+const TYPE_OPTS = [
+  { value: 'CONTABLE', label: 'CONTABLE' }, { value: 'LINEA_CREDITO', label: 'LÍNEA CRÉDITO' },
+]
 const BANKS: Array<'CHILE' | 'BCI' | 'ITAU' | 'SANTANDER'> = ['CHILE', 'BCI', 'ITAU', 'SANTANDER']
 
 export default async function BancosPage() {
@@ -35,6 +43,7 @@ export default async function BancosPage() {
     totalsByBank.set(s.bank, (totalsByBank.get(s.bank) ?? 0) + Number(s.balance))
   }
   const totalContable = Array.from(totalsByBank.values()).reduce((a, b) => a + b, 0)
+  const companyOpts = companies.map(c => ({ value: c.id, label: c.name }))
 
   return (
     <div className="q4-page" style={{ padding: 32 }}>
@@ -105,34 +114,50 @@ export default async function BancosPage() {
             </tr>
           </thead>
           <tbody>
-            {saldos.map((s, i) => (
-              <tr key={s.id} style={{
-                borderBottom: '1px solid rgba(255,255,255,0.04)',
-                background: i % 2 === 0 ? 'transparent' : '#F8FAFC',
-              }}>
-                <td style={{ padding: '10px 16px', color: '#475569', fontSize: 12, whiteSpace: 'nowrap' }}>
-                  {formatDate(s.recordedAt)}
-                </td>
-                <td style={{ padding: '10px 16px', color: '#0F1A2E', fontSize: 13, fontWeight: 600 }}>
-                  {BANK_LABELS[s.bank] ?? s.bank}
-                </td>
-                <td style={{ padding: '10px 16px', color: '#475569', fontSize: 13 }}>{s.company.name}</td>
-                <td style={{ padding: '10px 16px' }}>
-                  <span style={{
-                    background: s.type === 'CONTABLE' ? '#F0FDF4' : '#FEFCE8',
-                    color: s.type === 'CONTABLE' ? '#16A34A' : '#CA8A04',
-                    borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700,
-                  }}>{s.type}</span>
-                </td>
-                <td style={{ padding: '10px 16px', textAlign: 'right', color: '#0F1A2E',
-                  fontSize: 14, fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>
-                  {formatCLP(Number(s.balance))}
-                </td>
-                <td style={{ padding: '10px 16px', textAlign: 'right' }}>
-                  <DeleteSaldoButton id={s.id} />
-                </td>
-              </tr>
-            ))}
+            {saldos.map((s, i) => {
+              const ep = `/api/bancos/${s.id}`
+              return (
+                <tr key={s.id} style={{
+                  borderBottom: '1px solid rgba(255,255,255,0.04)',
+                  background: i % 2 === 0 ? 'transparent' : '#F8FAFC',
+                }}>
+                  <td style={{ padding: '4px 12px', color: '#475569', fontSize: 12, whiteSpace: 'nowrap' }}>
+                    <EditableCell txId={s.id} field="recordedAt" kind="date" endpoint={ep}
+                      value={s.recordedAt.toISOString().slice(0, 10)}
+                      display={<span style={{ color: '#475569' }}>{formatDate(s.recordedAt)}</span>} />
+                  </td>
+                  <td style={{ padding: '4px 12px', minWidth: 140 }}>
+                    <EditableCell txId={s.id} field="bank" kind="select" endpoint={ep} stringValue
+                      value={s.bank} options={BANK_OPTS}
+                      display={<span style={{ color: '#0F1A2E', fontWeight: 600 }}>{BANK_LABELS[s.bank] ?? s.bank}</span>} />
+                  </td>
+                  <td style={{ padding: '4px 12px', minWidth: 150 }}>
+                    <EditableCell txId={s.id} field="companyId" kind="select" endpoint={ep}
+                      value={s.companyId} options={companyOpts}
+                      display={<span style={{ color: '#475569', fontSize: 13 }}>{s.company.name}</span>} />
+                  </td>
+                  <td style={{ padding: '4px 12px', minWidth: 130 }}>
+                    <EditableCell txId={s.id} field="type" kind="select" endpoint={ep} stringValue
+                      value={s.type} options={TYPE_OPTS}
+                      display={
+                        <span style={{
+                          background: s.type === 'CONTABLE' ? '#F0FDF4' : '#FEFCE8',
+                          color: s.type === 'CONTABLE' ? '#16A34A' : '#CA8A04',
+                          borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700,
+                        }}>{s.type}</span>
+                      } />
+                  </td>
+                  <td style={{ padding: '4px 12px', textAlign: 'right' }}>
+                    <EditableCell txId={s.id} field="balance" kind="money" endpoint={ep} align="right" fontWeight={700}
+                      value={Number(s.balance)}
+                      display={<span style={{ color: '#0F1A2E', fontSize: 14, fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{formatCLP(Number(s.balance))}</span>} />
+                  </td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right' }}>
+                    <DeleteSaldoButton id={s.id} />
+                  </td>
+                </tr>
+              )
+            })}
             {saldos.length === 0 && (
               <tr>
                 <td colSpan={6} style={{ padding: '32px 16px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
