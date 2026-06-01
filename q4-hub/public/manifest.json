@@ -1,7 +1,7 @@
 {
   "name": "Q4 Hub — Gestión Financiera",
   "short_name": "Q4 Hub",
-  "description": "Sistema de gestión Nobarso / IDQ4",
+  "description": "Sistema de gestión Nobarzo / IDQ4",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",

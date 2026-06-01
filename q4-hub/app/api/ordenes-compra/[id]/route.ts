@@ -19,8 +19,9 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const oc = await prisma.purchaseOrder.findUnique({
     where: { id: Number(id) },
     include: {
+      company: { select: { name: true, rut: true } },
       costCenter: { select: { id: true, code: true, name: true } },
-      provider: { select: { id: true, name: true, rut: true } },
+      provider: { select: { id: true, name: true, rut: true, address: true, city: true, contactName: true, email: true, phone: true } },
       transactions: {
         include: {
           provider: { select: { name: true } },
@@ -38,7 +39,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   try {
     const { id } = await params
     const body = await req.json()
-
     const data: Prisma.PurchaseOrderUncheckedUpdateInput = {}
 
     if (body.companyId !== undefined) data.companyId = n(body.companyId) ?? undefined
@@ -48,9 +48,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       data.description = desc
     }
     if (body.total !== undefined) data.total = new Prisma.Decimal(n(body.total) ?? 0)
+    if (body.retencion !== undefined) data.retencion = n(body.retencion) != null ? new Prisma.Decimal(n(body.retencion)!) : null
     if (body.costCenterId !== undefined) data.costCenterId = n(body.costCenterId)
     if (body.providerId !== undefined) data.providerId = n(body.providerId)
     if (body.status !== undefined) data.status = body.status
+    if (body.projectNumber !== undefined) data.projectNumber = s(body.projectNumber)
+    if (body.solicitadoPor !== undefined) data.solicitadoPor = s(body.solicitadoPor)
+    if (body.gerencia !== undefined) data.gerencia = s(body.gerencia)
+    if (body.cotizacionNum !== undefined) data.cotizacionNum = s(body.cotizacionNum)
+    if (body.condicionPago !== undefined) data.condicionPago = s(body.condicionPago)
+    if (body.tipoMoneda !== undefined) data.tipoMoneda = body.tipoMoneda === 'UF' ? 'UF' : 'CLP'
 
     const oc = await prisma.purchaseOrder.update({ where: { id: Number(id) }, data })
     return NextResponse.json(oc)

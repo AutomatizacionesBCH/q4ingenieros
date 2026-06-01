@@ -17,6 +17,7 @@ function s(v: unknown): string | null {
 export async function GET() {
   const ocs = await prisma.purchaseOrder.findMany({
     include: {
+      company: { select: { name: true } },
       costCenter: { select: { code: true, name: true } },
       provider: { select: { name: true, rut: true } },
       transactions: { select: { gross: true, status: true } },
@@ -45,10 +46,7 @@ export async function POST(req: Request) {
     if (!companyId) errors.push('Empresa requerida')
     if (!description) errors.push('Descripción requerida')
     if (total == null) errors.push('Total requerido')
-
-    if (errors.length) {
-      return NextResponse.json({ error: errors.join(', ') }, { status: 400 })
-    }
+    if (errors.length) return NextResponse.json({ error: errors.join(', ') }, { status: 400 })
 
     const data: Prisma.PurchaseOrderUncheckedCreateInput = {
       companyId: companyId!,
@@ -56,6 +54,13 @@ export async function POST(req: Request) {
       total: new Prisma.Decimal(total!),
       costCenterId: n(body.costCenterId) ?? undefined,
       providerId: n(body.providerId) ?? undefined,
+      projectNumber: s(body.projectNumber) ?? undefined,
+      solicitadoPor: s(body.solicitadoPor) ?? undefined,
+      gerencia: s(body.gerencia) ?? undefined,
+      cotizacionNum: s(body.cotizacionNum) ?? undefined,
+      condicionPago: s(body.condicionPago) ?? undefined,
+      tipoMoneda: body.tipoMoneda === 'UF' ? 'UF' : 'CLP',
+      retencion: n(body.retencion) != null ? new Prisma.Decimal(n(body.retencion)!) : undefined,
       status: body.status ?? 'ACTIVA',
     }
 

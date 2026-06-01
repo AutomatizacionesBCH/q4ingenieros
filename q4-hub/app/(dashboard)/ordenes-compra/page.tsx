@@ -10,6 +10,7 @@ const STATUS_COLOR: Record<string, string> = { ACTIVA: '#16A34A', CERRADA: '#94A
 export default async function OrdenesCompraPage() {
   const ocs = await prisma.purchaseOrder.findMany({
     include: {
+      company: { select: { name: true } },
       costCenter: { select: { code: true, name: true } },
       provider: { select: { name: true } },
       transactions: { select: { gross: true, status: true } },
@@ -64,10 +65,10 @@ export default async function OrdenesCompraPage() {
       </div>
 
       <div style={{ background: '#FFFFFF', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1200 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-              {['ID', 'CeCo', 'Descripción', 'Proveedor', 'Total OC', 'Pagado', 'Saldo', 'Estado', 'Acción'].map(h => (
+              {['N° OC', 'Empresa', 'N° Proyecto', 'CeCo', 'Descripción', 'Proveedor', 'Total OC', 'Pagado', 'Saldo', 'Estado', 'Acción'].map(h => (
                 <th key={h} style={{
                   padding: '12px 14px', textAlign: ['Total OC', 'Pagado', 'Saldo'].includes(h) ? 'right' : 'left',
                   color: '#94A3B8', fontSize: 11, fontWeight: 700,
@@ -88,9 +89,19 @@ export default async function OrdenesCompraPage() {
                     OC-{String(oc.id).padStart(4, '0')}
                   </Link>
                 </td>
-                <td style={{ padding: '10px 14px', color: '#475569', fontSize: 12 }}>{oc.costCenter?.code ?? '—'}</td>
-                <td style={{ padding: '10px 14px', color: '#0F1A2E', fontSize: 13, maxWidth: 280,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={oc.description}>{oc.description}</td>
+                <td style={{ padding: '10px 14px', color: '#475569', fontSize: 12, whiteSpace: 'nowrap' }}>
+                  {oc.company.name.split(' ')[0]}
+                </td>
+                <td style={{ padding: '10px 14px', color: '#E5501E', fontSize: 12, fontFamily: 'monospace' }}>
+                  {oc.projectNumber ?? '—'}
+                </td>
+                <td style={{ padding: '10px 14px', color: '#475569', fontSize: 12 }}>
+                  {oc.costCenter ? `${oc.costCenter.code}` : '—'}
+                </td>
+                <td style={{ padding: '10px 14px', color: '#0F1A2E', fontSize: 13, maxWidth: 220,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={oc.description}>
+                  {oc.description}
+                </td>
                 <td style={{ padding: '10px 14px', color: '#475569', fontSize: 12 }}>{oc.provider?.name ?? '—'}</td>
                 <td style={{ padding: '10px 14px', textAlign: 'right', color: '#0F1A2E', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
                   {formatCLP(Number(oc.total))}
@@ -112,14 +123,27 @@ export default async function OrdenesCompraPage() {
                     borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700,
                   }}>{oc.status}</span>
                 </td>
-                <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                <td style={{ padding: '10px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <a
+                    href={`/api/pdf/oc/${oc.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-block', marginRight: 6,
+                      background: '#0F1A2E', color: '#fff',
+                      borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600,
+                      textDecoration: 'none',
+                    }}
+                  >
+                    PDF
+                  </a>
                   <CerrarOCButton id={oc.id} currentStatus={oc.status} />
                 </td>
               </tr>
             ))}
             {enriched.length === 0 && (
               <tr>
-                <td colSpan={9} style={{ padding: '32px 14px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
+                <td colSpan={11} style={{ padding: '32px 14px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
                   Sin órdenes de compra — usa &ldquo;+ Nueva OC&rdquo; arriba
                 </td>
               </tr>

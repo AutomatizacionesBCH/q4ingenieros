@@ -79,7 +79,7 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
             style={{ borderRadius: 8 }} priority />
           <div style={{ flex: 1 }}>
             <div style={{ color: C.text, fontSize: 15, fontWeight: 700 }}>Q4 Hub</div>
-            <div style={{ color: C.muted, fontSize: 11 }}>Nobarso · IDQ4</div>
+            <div style={{ color: C.muted, fontSize: 11 }}>Nobarzo · IDQ4</div>
           </div>
           <button onClick={onClose} style={{
             background: 'none', border: 'none', color: C.dim,

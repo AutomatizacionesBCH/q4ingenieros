@@ -78,6 +78,7 @@ model Company {
   issuedInvoices IssuedInvoice[]
   bankBalances   BankBalance[]
   users          User[]
+  purchaseOrders PurchaseOrder[]
   createdAt      DateTime        @default(now())
 }
 
@@ -121,6 +122,9 @@ model Provider {
   rut              String            @unique
   email            String?
   phone            String?
+  address          String?
+  city             String?
+  contactName      String?
   transactions     Transaction[]
   purchaseOrders   PurchaseOrder[]
   closingProposals ClosingProposal[]
@@ -177,17 +181,25 @@ model Transaction {
 }
 
 model PurchaseOrder {
-  id           Int           @id @default(autoincrement())
-  companyId    Int
-  costCenterId Int?
-  costCenter   CostCenter?   @relation(fields: [costCenterId], references: [id])
-  providerId   Int?
-  provider     Provider?     @relation(fields: [providerId], references: [id])
-  description  String
-  total        Decimal       @db.Decimal(14, 2)
-  status       POStatus      @default(ACTIVA)
-  transactions Transaction[]
-  createdAt    DateTime      @default(now())
+  id            Int           @id @default(autoincrement())
+  companyId     Int
+  company       Company       @relation(fields: [companyId], references: [id])
+  costCenterId  Int?
+  costCenter    CostCenter?   @relation(fields: [costCenterId], references: [id])
+  providerId    Int?
+  provider      Provider?     @relation(fields: [providerId], references: [id])
+  projectNumber String?
+  description   String
+  solicitadoPor String?
+  gerencia      String?
+  cotizacionNum String?
+  condicionPago String?
+  tipoMoneda    Currency      @default(CLP)
+  total         Decimal       @db.Decimal(14, 2)
+  retencion     Decimal?      @db.Decimal(14, 2)
+  status        POStatus      @default(ACTIVA)
+  transactions  Transaction[]
+  createdAt     DateTime      @default(now())
 }
 
 model IssuedInvoice {
