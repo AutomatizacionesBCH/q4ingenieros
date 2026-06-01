@@ -1,85 +1,109 @@
 export const revalidate = 0
 
-import { prisma } from '@/lib/prisma'
-import { formatCLP } from '@/lib/fmt'
+import { Suspense } from 'react'
 import { T } from '@/lib/theme'
-import { FlujoCajaChart } from '@/components/dashboard/FlujoCajaChart'
+import { getCompanies } from '@/lib/maestros-cache'
+import {
+  monthBounds, getSaldoDisponible, getPeriodTotals,
+  getProjectedFlow, getPagosSemana, getEvolucionSemanal, getEvolucionMensual,
+  getDesglosePorEmpresa,
+} from '@/lib/dashboard-data'
+import { DashboardFilters } from '@/components/dashboard/DashboardFilters'
+import { SaldoKpiStrip } from '@/components/dashboard/SaldoKpiStrip'
+import { ProyeccionFlujoChart } from '@/components/dashboard/ProyeccionFlujoChart'
+import { AlertaFlujoPanel } from '@/components/dashboard/AlertaFlujoPanel'
+import { EvolucionSemanalChart } from '@/components/dashboard/EvolucionSemanalChart'
+import { EvolucionMensualChart } from '@/components/dashboard/EvolucionMensualChart'
+import { DesgloseEmpresaTable } from '@/components/dashboard/DesgloseEmpresaTable'
 import { PagosProximosWidget } from '@/components/dashboard/PagosProximosWidget'
 
-export default async function DashboardPage() {
-  const now = new Date()
-  const nextWeek = new Date(now.getTime() + 7 * 86400000)
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const startOfYear = new Date(now.getFullYear(), 0, 1)
+type SP = { companyId?: string; month?: string; status?: string }
 
-  const [pend, pagado, proximos, mensual] = await Promise.all([
-    prisma.transaction.aggregate({
-      where: { status: 'PENDIENTE', movementType: 'EGRESO' },
-      _sum: { gross: true },
-    }),
-    prisma.transaction.aggregate({
-      where: { status: 'PAGADO', movementType: 'EGRESO', paymentDate: { gte: startOfMonth } },
-      _sum: { gross: true },
-    }),
-    prisma.transaction.findMany({
-      where: { status: 'PENDIENTE', paymentDate: { lte: nextWeek } },
-      select: {
-        id: true, description: true, gross: true, paymentDate: true,
-        costCenter: { select: { code: true } },
-        provider: { select: { name: true } },
-      },
-      orderBy: { paymentDate: 'asc' },
-      take: 10,
-    }),
-    prisma.transaction.groupBy({
-      by: ['movementType'],
-      where: { paymentDate: { gte: startOfYear }, status: { not: 'NULO' } },
-      _sum: { net: true },
-    }),
+async function FiltrosWrapper() {
+  const companies = await getCompanies()
+  return <DashboardFilters companies={companies.map(c => ({ id: c.id, label: c.name }))} />
+}
+
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<SP> }) {
+  const sp = await searchParams
+  const companyId = sp.companyId ? Number(sp.companyId) : undefined
+  const status = sp.status || undefined
+  const mb = monthBounds(sp.month)
+
+  // saldo first — it seeds the forward-flow projection's starting balance
+  const saldoInfo = await getSaldoDisponible(companyId)
+
+  const [curr, prev, projected, pagos, evoSemanal, evoMensual, desglose] = await Promise.all([
+    getPeriodTotals(mb.start, mb.end, companyId, status),
+    getPeriodTotals(mb.prevStart, mb.prevEnd, companyId, status),
+    getProjectedFlow(saldoInfo.saldo, companyId),
+    getPagosSemana(companyId),
+    getEvolucionSemanal(companyId, status),
+    getEvolucionMensual(companyId, status),
+    getDesglosePorEmpresa(mb.start, mb.end, status),
   ])
 
-  const ingresosYTD = Number(mensual.find(m => m.movementType === 'INGRESO')?._sum.net ?? 0)
-  const egresosYTD = Number(mensual.find(m => m.movementType === 'EGRESO')?._sum.net ?? 0)
-  const totalPendiente = Number(pend._sum.gross ?? 0)
-  const totalPagadoMes = Number(pagado._sum.gross ?? 0)
+  const selectedCompany = companyId ? desglose.rows.find(r => r.companyId === companyId) : null
+  const scopeLabel = selectedCompany ? selectedCompany.name : 'Grupo (Nobarzo + Q4 + Transversal)'
 
   return (
     <div className="q4-page" style={{ padding: 28 }}>
-      <h1 className="q4-h1" style={{ color: T.textPrimary, fontSize: 22, fontWeight: 700, marginBottom: 24 }}>
-        Dashboard
-      </h1>
-
-      <div className="q4-kpi-grid q4-kpi-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
-        {[
-          { label: 'Pendiente por pagar', value: formatCLP(totalPendiente), color: T.warning },
-          { label: 'Pagado este mes', value: formatCLP(totalPagadoMes), color: T.success },
-          { label: 'Balance YTD', value: formatCLP(ingresosYTD - egresosYTD),
-            color: ingresosYTD - egresosYTD >= 0 ? T.success : T.danger },
-        ].map(kpi => (
-          <div key={kpi.label} style={{
-            background: T.card, borderRadius: 12,
-            border: `1px solid ${T.border}`, padding: '20px 24px',
-            boxShadow: '0 1px 2px rgba(15,26,46,0.04)',
-          }}>
-            <div style={{ color: T.textMuted, fontSize: 11, fontWeight: 700,
-              textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
-              {kpi.label}
-            </div>
-            <div style={{ color: kpi.color, fontSize: 26, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-              {kpi.value}
+      <div className="q4-content">
+        {/* Header */}
+        <div className="q4-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h1 className="q4-h1" style={{ color: T.textPrimary, fontSize: 22, fontWeight: 700, margin: 0 }}>Dashboard</h1>
+            <div style={{ color: T.textSec, fontSize: 12, marginTop: 4 }}>
+              {mb.label} · {scopeLabel}
             </div>
           </div>
-        ))}
-      </div>
+        </div>
 
-      <div className="q4-dash-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 20 }}>
-        <FlujoCajaChart />
-        <PagosProximosWidget pagos={proximos.map(p => ({
-          id: p.id, description: p.description,
-          gross: Number(p.gross), paymentDate: p.paymentDate?.toISOString() ?? null,
-          costCenter: p.costCenter?.code ?? null,
-          provider: p.provider?.name ?? null,
-        }))} />
+        {/* Filtros */}
+        <Suspense fallback={<div style={{ height: 75, background: T.card, borderRadius: 12, border: `1px solid ${T.border}`, marginBottom: 18 }} />}>
+          <FiltrosWrapper />
+        </Suspense>
+
+        {/* HERO: flujo proyectado + alerta */}
+        <div className="q4-dash-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 20 }}>
+          <ProyeccionFlujoChart data={projected.weeks} />
+          <AlertaFlujoPanel
+            projected={projected.weeks}
+            saldoActual={saldoInfo.saldo}
+            unscheduledEgresoCount={projected.unscheduledEgresoCount}
+          />
+        </div>
+
+        {/* KPI strip */}
+        <SaldoKpiStrip
+          saldo={saldoInfo.saldo}
+          saldoFecha={saldoInfo.saldoFecha}
+          curr={curr}
+          prev={prev}
+        />
+
+        {/* Pagos semana + evolución semanal */}
+        <div className="q4-dash-grid" style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 20, margin: '20px 0' }}>
+          <PagosProximosWidget
+            pagos={pagos.pagos}
+            title="Pagos pendientes · semana en curso"
+            total={pagos.total}
+            emptyLabel="Sin pagos pendientes esta semana ✓"
+            unscheduledCount={projected.unscheduledEgresoCount}
+          />
+          <EvolucionSemanalChart data={evoSemanal} />
+        </div>
+
+        {/* Evolución mensual + desglose por empresa */}
+        <div className="q4-dash-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          <EvolucionMensualChart data={evoMensual} highlightMonth={mb.key} />
+          <DesgloseEmpresaTable
+            rows={desglose.rows}
+            grupo={desglose.grupo}
+            singleCompany={companyId}
+            currentParams={{ month: sp.month, status: sp.status }}
+          />
+        </div>
       </div>
     </div>
   )

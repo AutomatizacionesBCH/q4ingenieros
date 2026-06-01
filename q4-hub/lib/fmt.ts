@@ -7,7 +7,10 @@ export function formatDate(d: Date | string | null | undefined): string {
   if (!d) return '—'
   const dt = typeof d === 'string' ? new Date(d) : d
   if (isNaN(dt.getTime())) return '—'
-  return dt.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  // Pin to UTC: payment/issue/due dates are @db.Date (stored at UTC midnight). Without a
+  // fixed zone, the same value renders one day earlier in a negative-offset browser (Chile)
+  // and mismatches the server render in client components (hydration warning).
+  return dt.toLocaleDateString('es-CL', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 /**
