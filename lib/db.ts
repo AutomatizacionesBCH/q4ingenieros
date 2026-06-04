@@ -428,6 +428,42 @@ export async function getProjectDetailFromDB(id: number): Promise<ProjectDetail 
   }
 }
 
+// ─── Control Mensual edits ────────────────────────────────────────────────────
+
+export interface ControlEditsData {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  edits:       Record<string, any>
+  extraMonths: string[]
+}
+
+export async function getControlEdits(): Promise<ControlEditsData> {
+  const supabase = getSupabase()
+  const { data } = await supabase
+    .from('control_edits')
+    .select('edits, extra_months')
+    .eq('id', 'singleton')
+    .maybeSingle()
+  if (!data) return { edits: {}, extraMonths: [] }
+  return {
+    edits:       (data.edits        ?? {}) as Record<string, unknown>,
+    extraMonths: (data.extra_months ?? []) as string[],
+  }
+}
+
+export async function saveControlEdits(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  edits: Record<string, any>,
+  extraMonths: string[],
+): Promise<void> {
+  const supabase = getSupabase()
+  await supabase
+    .from('control_edits')
+    .upsert(
+      { id: 'singleton', edits, extra_months: extraMonths, updated_at: new Date().toISOString() },
+      { onConflict: 'id' },
+    )
+}
+
 // ─── Seed functions ───────────────────────────────────────────────────────────
 
 export async function seedProject(summary: ProjectSummary): Promise<void> {

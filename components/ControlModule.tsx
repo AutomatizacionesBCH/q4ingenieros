@@ -312,8 +312,9 @@ function MonthCard({ mes, month, edits, onSave, onDelete }: {
   onDelete?: () => void        // for user-added months
 }) {
   const isMobile = useIsMobile()
-  const [editing, setEditing] = useState(!month) // new months start in edit mode
-  const [draft, setDraft] = useState<Draft | null>(!month ? { facItems: [], ingItems: [] } : null)
+  const hasData = !!(edits.facturadoItems?.length || edits.ingresoItems?.length)
+  const [editing, setEditing] = useState(!month && !hasData) // nuevo sin data → edit; con data o del Excel → lectura
+  const [draft, setDraft] = useState<Draft | null>(!month && !hasData ? { facItems: [], ingItems: [] } : null)
 
   const startEdit = () => {
     const fac = edits.facturadoItems ?? month?.facturadoItems ?? []
@@ -574,35 +575,63 @@ export function ControlModule({ data }: { data: ControlData }) {
   const [allEdits,    setAllEdits]    = useState<Record<string, MonthEdits>>({})
   const [extraMonths, setExtraMonths] = useState<string[]>([])
 
+  // ── Carga: Supabase primero, localStorage como fallback ──────────────────────
   useEffect(() => {
+    // Cargar localStorage inmediatamente para evitar flicker
     setAllEdits(loadEdits())
     setExtraMonths(loadExtra())
+    // Sincronizar con Supabase (fuente de verdad compartida entre PCs)
+    fetch('/api/control-edits')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return
+        // Supabase tiene prioridad si tiene datos
+        if (Object.keys(data.edits).length > 0 || data.extraMonths.length > 0) {
+          setAllEdits(data.edits)
+          setExtraMonths(data.extraMonths)
+          saveEdits(data.edits)
+          saveExtra(data.extraMonths)
+        }
+      })
+      .catch(() => { /* sin conexión — usar localStorage */ })
+  }, [])
+
+  // ── Guarda: localStorage + Supabase en paralelo ───────────────────────────────
+  const persistAll = useCallback((edits: Record<string, MonthEdits>, extra: string[]) => {
+    saveEdits(edits)
+    saveExtra(extra)
+    fetch('/api/control-edits', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ edits, extraMonths: extra }),
+    }).catch(() => { /* sin conexión — quedó en localStorage */ })
   }, [])
 
   const handleSave = useCallback((mes: string, edits: MonthEdits) => {
     setAllEdits(prev => {
       const next = { ...prev, [mes]: edits }
-      saveEdits(next)
+      persistAll(next, extraMonths)
       return next
     })
-  }, [])
+  }, [extraMonths, persistAll])
 
   const addMonth = (mes: string) => {
-    const next = [...extraMonths, mes]
-    setExtraMonths(next)
-    saveExtra(next)
-    // Initialize with empty edits
+    const nextExtra = [...extraMonths, mes]
+    setExtraMonths(nextExtra)
     setAllEdits(prev => {
-      const next2 = { ...prev, [mes]: {} }
-      saveEdits(next2)
-      return next2
+      const next = { ...prev, [mes]: {} }
+      persistAll(next, nextExtra)
+      return next
     })
   }
 
   const deleteMonth = (mes: string) => {
-    const next = extraMonths.filter(m => m !== mes)
-    setExtraMonths(next)
-    saveExtra(next)
+    const nextExtra = extraMonths.filter(m => m !== mes)
+    setExtraMonths(nextExtra)
+    setAllEdits(prev => {
+      persistAll(prev, nextExtra)
+      return prev
+    })
   }
 
   const existingMesNames = data.months.map(m => m.mes)
