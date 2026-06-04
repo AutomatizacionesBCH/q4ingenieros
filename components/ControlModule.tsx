@@ -313,7 +313,7 @@ function MonthCard({ mes, month, edits, onSave, onDelete }: {
 }) {
   const isMobile = useIsMobile()
   const [editing, setEditing] = useState(!month) // new months start in edit mode
-  const [draft, setDraft] = useState<Draft | null>(null)
+  const [draft, setDraft] = useState<Draft | null>(!month ? { facItems: [], ingItems: [] } : null)
 
   const startEdit = () => {
     const fac = edits.facturadoItems ?? month?.facturadoItems ?? []
