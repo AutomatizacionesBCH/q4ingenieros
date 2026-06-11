@@ -398,8 +398,6 @@ export function EgresoMensualModule() {
     return s + items.reduce((a, it) => a + (it.amount ?? 0), 0)
   }, 0)
 
-  const pct = totalProy > 0 ? Math.min(100, (totalPag / totalProy) * 100) : 0
-
   return (
     <div style={{ height: '100vh', overflowY: 'auto', background: C.canvas }}>
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: isMobile ? '16px 12px 32px' : '24px 24px 48px' }}>
@@ -410,24 +408,35 @@ export function EgresoMensualModule() {
           <p style={{ margin: '4px 0 0', fontSize: 12, color: C.textMt }}>Proyección vs egresos reales por mes</p>
         </div>
 
-        {/* Summary card */}
+        {/* Summary table */}
         {extraMonths.length > 0 && (
-          <div style={{ background: C.card, borderRadius: 14, boxShadow: C.shadow, padding: '20px 24px', marginBottom: 28, display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 24 }}>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: C.textMt, textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 6 }}>Total Proyectado</div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: C.warn, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{fmtCLP(totalProy || null)}</div>
+          <div style={{ background: C.navy, borderRadius: 14, boxShadow: C.shadow, overflow: 'hidden', marginBottom: 28 }}>
+            {/* Table header */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.45)' }}>MES</span>
+              <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4ADE80', textAlign: 'right' }}>EGRESO PAGADO</span>
             </div>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: C.textMt, textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 6 }}>Total Pagado</div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: C.green, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{fmtCLP(totalPag || null)}</div>
-              {totalProy > 0 && (
-                <>
-                  <div style={{ height: 5, background: C.border, borderRadius: 3, overflow: 'hidden', marginTop: 10 }}>
-                    <div style={{ height: '100%', width: `${pct}%`, background: pct > 100 ? '#DC2626' : C.green, borderRadius: 3, transition: 'width 0.4s' }} />
-                  </div>
-                  <div style={{ fontSize: 10, color: C.textMt, marginTop: 4 }}>{pct.toFixed(1)}% ejecutado</div>
-                </>
-              )}
+            {/* Rows */}
+            {extraMonths.map((mes, i) => {
+              const pagado = (allEdits[mes]?.pagadosItems ?? []).reduce((s, it) => s + (it.amount ?? 0), 0)
+              return (
+                <div key={mes} style={{
+                  display: 'grid', gridTemplateColumns: '1fr auto',
+                  padding: '11px 20px',
+                  borderBottom: i < extraMonths.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                  background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.025)',
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: '#F0EDE8' }}>{mes}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: pagado > 0 ? '#4ADE80' : 'rgba(255,255,255,0.25)', fontVariantNumeric: 'tabular-nums' }}>
+                    {pagado > 0 ? fmtCLP(pagado) : '—'}
+                  </span>
+                </div>
+              )
+            })}
+            {/* Total footer */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', padding: '12px 20px', background: 'rgba(255,255,255,0.06)', borderTop: '1px solid rgba(255,255,255,0.10)' }}>
+              <span style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(255,255,255,0.6)' }}>TOTAL Q4</span>
+              <span style={{ fontSize: 15, fontWeight: 900, color: '#4ADE80', fontVariantNumeric: 'tabular-nums' }}>{fmtCLP(totalPag || null)}</span>
             </div>
           </div>
         )}
