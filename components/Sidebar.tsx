@@ -21,6 +21,7 @@ const C = {
 const MODULES = [
   { href: '/proyectos',         label: 'Proyectos',              short: 'Proyectos',  icon: '⬡' },
   { href: '/control',           label: 'Control Mensual 2026',   short: 'Mensual',    icon: '◈' },
+  { href: '/egreso-mensual',    label: 'Egreso Mensual 2026',    short: 'Egresos',    icon: '◐' },
   { href: '/control-pendiente', label: 'Pendiente Histórico',    short: 'Pendiente',  icon: '◉' },
   { href: '/documentos',        label: 'Documentos Tributarios', short: 'Docs',       icon: '◧' },
   { href: '/propuestas',        label: 'Propuestas de Cierre',   short: 'Cierres',    icon: '◎' },

@@ -464,6 +464,36 @@ export async function saveControlEdits(
     )
 }
 
+// ─── Egreso Mensual edits ─────────────────────────────────────────────────────
+
+export async function getEgresoEdits(): Promise<ControlEditsData> {
+  const supabase = getSupabase()
+  const { data } = await supabase
+    .from('egreso_edits')
+    .select('edits, extra_months')
+    .eq('id', 'singleton')
+    .maybeSingle()
+  if (!data) return { edits: {}, extraMonths: [] }
+  return {
+    edits:       (data.edits        ?? {}) as Record<string, unknown>,
+    extraMonths: (data.extra_months ?? []) as string[],
+  }
+}
+
+export async function saveEgresoEdits(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  edits: Record<string, any>,
+  extraMonths: string[],
+): Promise<void> {
+  const supabase = getSupabase()
+  await supabase
+    .from('egreso_edits')
+    .upsert(
+      { id: 'singleton', edits, extra_months: extraMonths, updated_at: new Date().toISOString() },
+      { onConflict: 'id' },
+    )
+}
+
 // ─── Seed functions ───────────────────────────────────────────────────────────
 
 export async function seedProject(summary: ProjectSummary): Promise<void> {
