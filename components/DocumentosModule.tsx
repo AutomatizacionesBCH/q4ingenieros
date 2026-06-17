@@ -187,6 +187,14 @@ export function DocumentosModule() {
     ]).then(([docsData, ovData]: [{ docs: DocItem[] }, Overrides]) => {
       setDocs(docsData.docs ?? [])
       setOverrides(ovData ?? {})
+      // Tras un refresh, re-cargar en 8s para recoger fechas extraídas en background
+      if (refresh) {
+        setTimeout(() => {
+          fetch('/api/documents').then(r => r.ok ? r.json() : null).then(d => {
+            if (d?.docs) setDocs(d.docs)
+          }).catch(() => {})
+        }, 8000)
+      }
     }).catch(e => { setError(String(e)) })
       .finally(() => { setLoading(false); setRefreshing(false) })
   }, [])

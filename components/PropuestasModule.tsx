@@ -201,6 +201,13 @@ export function PropuestasModule() {
       .then(r => r.json())
       .then((d: { propuestas: PropuestaItem[] }) => {
         setPropuestas(d.propuestas ?? [])
+        if (refresh) {
+          setTimeout(() => {
+            fetch('/api/propuestas').then(r => r.json()).then((d2: { propuestas: PropuestaItem[] }) => {
+              if (d2?.propuestas) setPropuestas(d2.propuestas)
+            }).catch(() => {})
+          }, 8000)
+        }
       })
       .catch(e => { setError(String(e)) })
       .finally(() => { setLoading(false); setRefreshing(false) })
