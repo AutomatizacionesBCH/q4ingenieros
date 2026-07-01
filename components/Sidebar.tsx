@@ -25,6 +25,7 @@ const MODULES = [
   { href: '/control-pendiente', label: 'Pendiente Histórico',    short: 'Pendiente',  icon: '◉' },
   { href: '/documentos',        label: 'Documentos Tributarios', short: 'Docs',       icon: '◧' },
   { href: '/propuestas',        label: 'Propuestas de Cierre',   short: 'Cierres',    icon: '◎' },
+  { href: '/reportes',          label: 'Reportería',             short: 'Reportes',   icon: '▦' },
 ]
 
 function useUF() {
