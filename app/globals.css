@@ -49,3 +49,20 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* ── Print-only export (used by report modules, e.g. Avance Semanal) ────────
+   .print-portal is mounted directly on <body> via a React portal. Normally
+   hidden; while body carries .print-report-mode (set right before
+   window.print()), everything else under <body> is hidden and only the
+   portal is shown, full width. See components/AvanceSemanalModule.tsx. */
+.print-portal {
+  display: none;
+}
+@media print {
+  body.print-report-mode > *:not(.print-portal) {
+    display: none !important;
+  }
+  body.print-report-mode .print-portal {
+    display: block !important;
+  }
+}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
 // ─── Tokens ───────────────────────────────────────────────────────────────────
@@ -66,6 +67,54 @@ function newWeek(label: string): Week {
   return { id: uid(), label, columns, rows }
 }
 
+function nonEmptyRows(week: Week): Row[] {
+  return week.rows.filter(r => week.columns.some(c => (r.values[c.id] ?? '').trim() !== ''))
+}
+
+// ─── Copy-to-clipboard (rich HTML table, for pasting into email) ────────────
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function buildWeekHtml(mes: string, week: Week): string {
+  const rows = nonEmptyRows(week)
+  const thStyle = 'background:#2563EB;color:#ffffff;padding:8px 10px;text-align:left;border:1px solid #1D4ED8;font-family:Arial,sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;'
+  const tdStyle = 'padding:8px 10px;border:1px solid #E2E8F0;font-family:Arial,sans-serif;font-size:13px;color:#0F1A2E;'
+  const header = `<tr>${week.columns.map(c => `<th style="${thStyle}">${escapeHtml(c.label || '—')}</th>`).join('')}</tr>`
+  const body = rows.map((r, i) =>
+    `<tr>${week.columns.map(c => `<td style="${tdStyle}background:${i % 2 === 0 ? '#ffffff' : '#FAFBFD'};">${escapeHtml(r.values[c.id] ?? '')}</td>`).join('')}</tr>`
+  ).join('')
+  const title = `<div style="font-family:Arial,sans-serif;font-size:13px;font-weight:700;color:#0F1A2E;margin-bottom:8px;">Semana ${escapeHtml(week.label || '—')} — ${escapeHtml(mes)}</div>`
+  return `${title}<table style="border-collapse:collapse;">${header}${body}</table>`
+}
+
+function buildWeekText(week: Week): string {
+  const rows = nonEmptyRows(week)
+  const header = week.columns.map(c => c.label).join('\t')
+  const body = rows.map(r => week.columns.map(c => r.values[c.id] ?? '').join('\t')).join('\n')
+  return [header, body].filter(Boolean).join('\n')
+}
+
+async function copyWeek(mes: string, week: Week): Promise<boolean> {
+  const html = buildWeekHtml(mes, week)
+  const text = buildWeekText(week)
+  try {
+    if (typeof ClipboardItem !== 'undefined') {
+      const item = new ClipboardItem({
+        'text/html':  new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([text], { type: 'text/plain' }),
+      })
+      await navigator.clipboard.write([item])
+      return true
+    }
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    try { await navigator.clipboard.writeText(text); return true } catch { return false }
+  }
+}
+
 // ─── Editable cell ────────────────────────────────────────────────────────────
 
 function Cell({ value, onChange, placeholder, bold }: { value: string; onChange: (v: string) => void; placeholder?: string; bold?: boolean }) {
@@ -85,11 +134,19 @@ function Cell({ value, onChange, placeholder, bold }: { value: string; onChange:
 
 // ─── Week block ───────────────────────────────────────────────────────────────
 
-function WeekBlock({ week, onChange, onDelete }: {
+function WeekBlock({ mes, week, onChange, onDelete }: {
+  mes:      string
   week:     Week
   onChange: (w: Week) => void
   onDelete: () => void
 }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    const ok = await copyWeek(mes, week)
+    if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1500) }
+  }
+
   const updateLabel = (label: string) => onChange({ ...week, label })
 
   const updateColLabel = (colId: string, label: string) =>
@@ -139,6 +196,9 @@ function WeekBlock({ week, onChange, onDelete }: {
           style={{ border: `1px solid ${C.border}`, borderRadius: 6, padding: '4px 9px', fontSize: 12, fontWeight: 700, color: C.text, background: C.card, outline: 'none', width: 110 }}
         />
         <div style={{ flex: 1 }} />
+        <button onClick={handleCopy} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: copied ? '#F0FDF4' : C.card, cursor: 'pointer', color: copied ? '#16A34A' : C.textSec, fontSize: 11, fontWeight: 600, padding: '4px 10px' }}>
+          {copied ? '✓ Copiado' : '⧉ Copiar'}
+        </button>
         <button onClick={onDelete} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.textMt, fontSize: 11, fontWeight: 600 }}>
           Eliminar semana
         </button>
@@ -209,11 +269,12 @@ function WeekBlock({ week, onChange, onDelete }: {
 
 // ─── Month card ───────────────────────────────────────────────────────────────
 
-function MonthCard({ mes, data, onChange, onDelete }: {
-  mes:      string
-  data:     MonthData
-  onChange: (d: MonthData) => void
-  onDelete: () => void
+function MonthCard({ mes, data, onChange, onDelete, onExportPdf }: {
+  mes:         string
+  data:        MonthData
+  onChange:    (d: MonthData) => void
+  onDelete:    () => void
+  onExportPdf: () => void
 }) {
   const weeks = data.weeks ?? []
 
@@ -228,6 +289,9 @@ function MonthCard({ mes, data, onChange, onDelete }: {
       <div style={{ background: C.navy, padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 16, fontWeight: 900, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{mes}</span>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onExportPdf} style={{ fontSize: 11, padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.3)', background: 'transparent', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>
+            ⭳ Exportar PDF
+          </button>
           <button onClick={onDelete} style={{ fontSize: 11, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.3)', background: 'transparent', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontWeight: 600 }}>
             Eliminar mes
           </button>
@@ -244,9 +308,58 @@ function MonthCard({ mes, data, onChange, onDelete }: {
           </div>
         )}
         {weeks.map(w => (
-          <WeekBlock key={w.id} week={w} onChange={updated => updateWeek(w.id, updated)} onDelete={() => deleteWeek(w.id)} />
+          <WeekBlock key={w.id} mes={mes} week={w} onChange={updated => updateWeek(w.id, updated)} onDelete={() => deleteWeek(w.id)} />
         ))}
       </div>
+    </div>
+  )
+}
+
+// ─── Printable month (mounted via portal on <body> only while printing) ─────
+
+function PrintableMonth({ mes, data }: { mes: string; data: MonthData }) {
+  const weeks = (data.weeks ?? [])
+    .map(w => ({ ...w, rows: nonEmptyRows(w) }))
+    .filter(w => w.rows.length > 0)
+
+  return (
+    <div className="print-portal" style={{ padding: 32, fontFamily: 'Arial, sans-serif', color: C.text }}>
+      <div style={{ fontSize: 11, color: C.textMt, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+        Q4 Ingenieros — Reportería
+      </div>
+      <h1 style={{ margin: '0 0 22px', fontSize: 20 }}>Avance Semanal Proyectos — {mes}</h1>
+
+      {weeks.length === 0 && (
+        <p style={{ color: C.textMt, fontSize: 13 }}>Sin datos registrados para este mes.</p>
+      )}
+
+      {weeks.map(w => (
+        <div key={w.id} style={{ marginBottom: 26, breakInside: 'avoid' } as React.CSSProperties}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Semana {w.label || '—'}</div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {w.columns.map(c => (
+                  <th key={c.id} style={{ background: C.blue, color: '#fff', padding: '8px 10px', textAlign: 'left', border: '1px solid #1D4ED8', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                    {c.label || '—'}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {w.rows.map((r, i) => (
+                <tr key={r.id} style={{ background: i % 2 === 0 ? '#fff' : '#FAFBFD' }}>
+                  {w.columns.map(c => (
+                    <td key={c.id} style={{ padding: '8px 10px', border: `1px solid ${C.border}`, fontSize: 12 }}>
+                      {r.values[c.id] ?? ''}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
     </div>
   )
 }
@@ -300,7 +413,24 @@ export function AvanceSemanalModule() {
   const [allData,     setAllData]     = useState<Record<string, MonthData>>({})
   const [extraMonths, setExtraMonths] = useState<string[]>([])
   const [savedTag,     setSavedTag]   = useState(false)
+  const [printingMonth, setPrintingMonth] = useState<string | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ── Export a single month as PDF via the browser's print dialog ───────────
+  useEffect(() => {
+    if (!printingMonth) return
+    document.body.classList.add('print-report-mode')
+    const t = setTimeout(() => window.print(), 60)
+    const cleanup = () => {
+      document.body.classList.remove('print-report-mode')
+      setPrintingMonth(null)
+    }
+    window.addEventListener('afterprint', cleanup)
+    return () => {
+      clearTimeout(t)
+      window.removeEventListener('afterprint', cleanup)
+    }
+  }, [printingMonth])
 
   // ── Load: localStorage inmediato, Supabase como fuente de verdad ──────────
   useEffect(() => {
@@ -386,10 +516,16 @@ export function AvanceSemanalModule() {
             data={allData[mes] ?? { weeks: [] }}
             onChange={d => handleMonthChange(mes, d)}
             onDelete={() => deleteMonth(mes)}
+            onExportPdf={() => setPrintingMonth(mes)}
           />
         ))}
 
         <AddMonthPanel existing={extraMonths} onAdd={addMonth} />
+
+        {printingMonth && typeof document !== 'undefined' && createPortal(
+          <PrintableMonth mes={printingMonth} data={allData[printingMonth] ?? { weeks: [] }} />,
+          document.body,
+        )}
 
         {extraMonths.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 20px' }}>
