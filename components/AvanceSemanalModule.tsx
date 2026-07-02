@@ -25,7 +25,7 @@ const C = {
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Column { id: string; label: string }
 interface Row     { id: string; values: Record<string, string> }
-interface Week    { id: string; label: string; columns: Column[]; rows: Row[] }
+interface Week    { id: string; label: string; columns: Column[]; rows: Row[]; locked?: boolean }
 interface MonthData { weeks: Week[] }
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
@@ -51,7 +51,7 @@ const ALL_MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
 const DEFAULT_COLUMNS: Column[] = [
   { id: uid(), label: 'N° Proyecto' },
   { id: uid(), label: 'Nombre' },
-  { id: uid(), label: 'Proyectista' },
+  { id: uid(), label: 'Responsable' },
   { id: uid(), label: 'Estado' },
 ]
 
@@ -64,11 +64,28 @@ function emptyRow(columns: Column[]): Row {
 function newWeek(label: string): Week {
   const columns = DEFAULT_COLUMNS.map(c => ({ id: uid(), label: c.label }))
   const rows = Array.from({ length: 6 }, () => emptyRow(columns))
-  return { id: uid(), label, columns, rows }
+  return { id: uid(), label, columns, rows, locked: false }
 }
 
 function nonEmptyRows(week: Week): Row[] {
   return week.rows.filter(r => week.columns.some(c => (r.values[c.id] ?? '').trim() !== ''))
+}
+
+// Renombra la columna "Proyectista" (nombre antiguo) a "Responsable" en datos ya guardados
+function migrateLabels(data: Record<string, MonthData>): Record<string, MonthData> {
+  let changed = false
+  const next: Record<string, MonthData> = {}
+  for (const [mes, month] of Object.entries(data)) {
+    const weeks = (month.weeks ?? []).map(w => {
+      const columns = w.columns.map(c => {
+        if (c.label.trim().toLowerCase() === 'proyectista') { changed = true; return { ...c, label: 'Responsable' } }
+        return c
+      })
+      return { ...w, columns }
+    })
+    next[mes] = { ...month, weeks }
+  }
+  return changed ? next : data
 }
 
 // ─── Copy-to-clipboard (rich HTML table, for pasting into email) ────────────
@@ -132,6 +149,14 @@ function Cell({ value, onChange, placeholder, bold }: { value: string; onChange:
   )
 }
 
+function ReadCell({ value }: { value: string }) {
+  return (
+    <div style={{ padding: '8px 10px', fontSize: 13, color: value ? C.text : C.textMt }}>
+      {value || '—'}
+    </div>
+  )
+}
+
 // ─── Week block ───────────────────────────────────────────────────────────────
 
 function WeekBlock({ mes, week, onChange, onDelete }: {
@@ -141,6 +166,7 @@ function WeekBlock({ mes, week, onChange, onDelete }: {
   onDelete: () => void
 }) {
   const [copied, setCopied] = useState(false)
+  const locked = !!week.locked
 
   const handleCopy = async () => {
     const ok = await copyWeek(mes, week)
@@ -184,22 +210,32 @@ function WeekBlock({ mes, week, onChange, onDelete }: {
     onChange({ ...week, rows: week.rows.filter(r => r.id !== rowId) })
   }
 
+  const displayRows = locked ? nonEmptyRows(week) : week.rows
+
   return (
-    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 16, overflow: 'hidden' }}>
+    <div style={{ background: C.card, border: `1px solid ${locked ? '#BBF7D0' : C.border}`, borderRadius: 10, marginBottom: 16, overflow: 'hidden' }}>
       {/* Week header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: C.listBg, borderBottom: `1px solid ${C.border}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: locked ? '#F0FDF4' : C.listBg, borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 10, fontWeight: 800, color: C.textMt, textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0 }}>Semana</span>
         <input
           value={week.label}
           onChange={e => updateLabel(e.target.value)}
-          placeholder="ej. 22/06"
-          style={{ border: `1px solid ${C.border}`, borderRadius: 6, padding: '4px 9px', fontSize: 12, fontWeight: 700, color: C.text, background: C.card, outline: 'none', width: 110 }}
+          placeholder="Título de la semana (ej. Semana del 22 al 26 de Junio)"
+          style={{ flex: 1, minWidth: 180, border: `1px solid ${C.border}`, borderRadius: 6, padding: '5px 10px', fontSize: 12, fontWeight: 700, color: C.text, background: C.card, outline: 'none' }}
         />
-        <div style={{ flex: 1 }} />
-        <button onClick={handleCopy} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: copied ? '#F0FDF4' : C.card, cursor: 'pointer', color: copied ? '#16A34A' : C.textSec, fontSize: 11, fontWeight: 600, padding: '4px 10px' }}>
+        <button onClick={handleCopy} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: copied ? '#F0FDF4' : C.card, cursor: 'pointer', color: copied ? '#16A34A' : C.textSec, fontSize: 11, fontWeight: 600, padding: '4px 10px', flexShrink: 0 }}>
           {copied ? '✓ Copiado' : '⧉ Copiar'}
         </button>
-        <button onClick={onDelete} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.textMt, fontSize: 11, fontWeight: 600 }}>
+        {locked ? (
+          <button onClick={() => onChange({ ...week, locked: false })} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: C.card, cursor: 'pointer', color: C.textSec, fontSize: 11, fontWeight: 600, padding: '4px 10px', flexShrink: 0 }}>
+            ✏ Editar
+          </button>
+        ) : (
+          <button onClick={() => onChange({ ...week, locked: true })} style={{ border: 'none', borderRadius: 6, background: '#16A34A', cursor: 'pointer', color: '#fff', fontSize: 11, fontWeight: 700, padding: '5px 14px', flexShrink: 0 }}>
+            ✓ OK
+          </button>
+        )}
+        <button onClick={onDelete} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.textMt, fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
           Eliminar semana
         </button>
       </div>
@@ -210,59 +246,80 @@ function WeekBlock({ mes, week, onChange, onDelete }: {
           <thead>
             <tr>
               {week.columns.map(col => (
-                <th key={col.id} style={{ background: C.blue, padding: '4px 4px 4px 10px', textAlign: 'left', borderRight: '1px solid rgba(255,255,255,0.15)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <input
-                      value={col.label}
-                      onChange={e => updateColLabel(col.id, e.target.value)}
-                      placeholder="Columna"
-                      style={{
-                        flex: 1, minWidth: 60, border: 'none', outline: 'none', background: 'transparent',
-                        padding: '6px 0', fontSize: 10, fontWeight: 800, color: '#fff',
-                        textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'inherit',
-                      }}
-                    />
-                    {week.columns.length > 1 && (
-                      <button onClick={() => removeColumn(col.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: 14, lineHeight: 1, padding: '0 4px' }}>
-                        ×
-                      </button>
-                    )}
-                  </div>
+                <th key={col.id} style={{ background: C.blue, padding: locked ? '9px 10px' : '4px 4px 4px 10px', textAlign: 'left', borderRight: '1px solid rgba(255,255,255,0.15)' }}>
+                  {locked ? (
+                    <span style={{ fontSize: 10, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {col.label || '—'}
+                    </span>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <input
+                        value={col.label}
+                        onChange={e => updateColLabel(col.id, e.target.value)}
+                        placeholder="Columna"
+                        style={{
+                          flex: 1, minWidth: 60, border: 'none', outline: 'none', background: 'transparent',
+                          padding: '6px 0', fontSize: 10, fontWeight: 800, color: '#fff',
+                          textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'inherit',
+                        }}
+                      />
+                      {week.columns.length > 1 && (
+                        <button onClick={() => removeColumn(col.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: 14, lineHeight: 1, padding: '0 4px' }}>
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </th>
               ))}
-              <th style={{ background: C.blue, width: 36, padding: 0 }}>
-                <button onClick={addColumn} title="Agregar columna" style={{ width: '100%', height: '100%', border: 'none', background: 'none', cursor: 'pointer', color: '#fff', fontSize: 15, fontWeight: 800, padding: '6px 0' }}>
-                  +
-                </button>
-              </th>
+              {!locked && (
+                <th style={{ background: C.blue, width: 36, padding: 0 }}>
+                  <button onClick={addColumn} title="Agregar columna" style={{ width: '100%', height: '100%', border: 'none', background: 'none', cursor: 'pointer', color: '#fff', fontSize: 15, fontWeight: 800, padding: '6px 0' }}>
+                    +
+                  </button>
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
-            {week.rows.map((row, i) => (
+            {displayRows.length === 0 && (
+              <tr>
+                <td colSpan={week.columns.length + 1} style={{ padding: '14px 10px', textAlign: 'center' }}>
+                  <span style={{ fontSize: 11, color: C.textMt, fontStyle: 'italic' }}>Sin registros</span>
+                </td>
+              </tr>
+            )}
+            {displayRows.map((row, i) => (
               <tr key={row.id} style={{ background: i % 2 === 0 ? C.card : '#FAFBFD' }}>
                 {week.columns.map(col => (
                   <td key={col.id} style={{ borderBottom: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}` }}>
-                    <Cell value={row.values[col.id] ?? ''} onChange={v => updateCell(row.id, col.id, v)} />
+                    {locked
+                      ? <ReadCell value={row.values[col.id] ?? ''} />
+                      : <Cell value={row.values[col.id] ?? ''} onChange={v => updateCell(row.id, col.id, v)} />}
                   </td>
                 ))}
-                <td style={{ borderBottom: `1px solid ${C.border}`, textAlign: 'center' }}>
-                  {week.rows.length > 1 && (
-                    <button onClick={() => removeRow(row.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#DC2626', fontSize: 15, lineHeight: 1, padding: '4px' }}>
-                      ×
-                    </button>
-                  )}
-                </td>
+                {!locked && (
+                  <td style={{ borderBottom: `1px solid ${C.border}`, textAlign: 'center' }}>
+                    {week.rows.length > 1 && (
+                      <button onClick={() => removeRow(row.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#DC2626', fontSize: 15, lineHeight: 1, padding: '4px' }}>
+                        ×
+                      </button>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <div style={{ padding: '8px 10px', borderTop: `1px solid ${C.border}` }}>
-        <button onClick={addRow} style={{ border: `1px dashed ${C.blue}`, borderRadius: 5, padding: '5px 0', fontSize: 9, color: C.blue, background: 'transparent', cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', width: '100%' }}>
-          + Agregar fila
-        </button>
-      </div>
+      {!locked && (
+        <div style={{ padding: '8px 10px', borderTop: `1px solid ${C.border}` }}>
+          <button onClick={addRow} style={{ border: `1px dashed ${C.blue}`, borderRadius: 5, padding: '5px 0', fontSize: 9, color: C.blue, background: 'transparent', cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', width: '100%' }}>
+            + Agregar fila
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -434,17 +491,25 @@ export function AvanceSemanalModule() {
 
   // ── Load: localStorage inmediato, Supabase como fuente de verdad ──────────
   useEffect(() => {
-    setAllData(loadEdits())
+    setAllData(migrateLabels(loadEdits()))
     setExtraMonths(loadExtra())
     fetch('/api/reporte-avance-edits')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!data) return
         if (Object.keys(data.edits).length > 0 || data.extraMonths.length > 0) {
-          setAllData(data.edits)
+          const migrated = migrateLabels(data.edits)
+          setAllData(migrated)
           setExtraMonths(data.extraMonths)
-          saveEditsLocal(data.edits)
+          saveEditsLocal(migrated)
           saveExtraLocal(data.extraMonths)
+          if (migrated !== data.edits) {
+            fetch('/api/reporte-avance-edits', {
+              method:  'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body:    JSON.stringify({ edits: migrated, extraMonths: data.extraMonths }),
+            }).catch(() => {})
+          }
         }
       })
       .catch(() => {})
