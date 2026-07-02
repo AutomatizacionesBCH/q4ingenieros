@@ -330,6 +330,7 @@ export function EgresoMensualModule() {
   const isMobile = useIsMobile()
   const [allEdits,    setAllEdits]    = useState<Record<string, MonthEdits>>({})
   const [extraMonths, setExtraMonths] = useState<string[]>([])
+  const [saveError,   setSaveError]   = useState(false)
 
   // ── Load: Supabase primero, localStorage fallback ─────────────────────────
   useEffect(() => {
@@ -350,6 +351,8 @@ export function EgresoMensualModule() {
   }, [])
 
   // ── Persist: localStorage + Supabase ─────────────────────────────────────
+  // Se verifica r.ok — si Supabase falla (ej. tabla inexistente) no se debe
+  // asumir que quedó sincronizado; solo vive en este navegador y hay que avisar.
   const persistAll = useCallback((edits: Record<string, MonthEdits>, extra: string[]) => {
     saveEditsLocal(edits)
     saveExtraLocal(extra)
@@ -357,7 +360,8 @@ export function EgresoMensualModule() {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ edits, extraMonths: extra }),
-    }).catch(() => {})
+    }).then(r => setSaveError(!r.ok))
+      .catch(() => setSaveError(true))
   }, [])
 
   const handleSave = useCallback((mes: string, edits: MonthEdits) => {
@@ -403,9 +407,16 @@ export function EgresoMensualModule() {
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: isMobile ? '16px 12px 32px' : '24px 24px 48px' }}>
 
         {/* Header */}
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.text }}>Egreso Mensual 2026</h1>
-          <p style={{ margin: '4px 0 0', fontSize: 12, color: C.textMt }}>Proyección vs egresos reales por mes</p>
+        <div style={{ marginBottom: 24, display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.text }}>Egreso Mensual 2026</h1>
+            <p style={{ margin: '4px 0 0', fontSize: 12, color: C.textMt }}>Proyección vs egresos reales por mes</p>
+          </div>
+          {saveError && (
+            <span style={{ fontSize: 11, color: '#DC2626', fontWeight: 700, background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 6, padding: '3px 9px' }}>
+              ⚠ No se pudo guardar en la nube — los cambios quedaron solo en este navegador
+            </span>
+          )}
         </div>
 
         {/* Summary table */}

@@ -8,6 +8,7 @@ export async function GET() {
     const data = await getControlEdits()
     return NextResponse.json(data)
   } catch (e) {
+    console.error('[api/control-edits GET]', e)
     return NextResponse.json({ edits: {}, extraMonths: [] }, { status: 200 })
   }
 }

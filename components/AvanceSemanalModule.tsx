@@ -470,6 +470,7 @@ export function AvanceSemanalModule() {
   const [allData,     setAllData]     = useState<Record<string, MonthData>>({})
   const [extraMonths, setExtraMonths] = useState<string[]>([])
   const [savedTag,     setSavedTag]   = useState(false)
+  const [saveError,    setSaveError]  = useState(false)
   const [printingMonth, setPrintingMonth] = useState<string | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -516,6 +517,9 @@ export function AvanceSemanalModule() {
   }, [])
 
   // ── Persist: localStorage inmediato, Supabase con debounce ───────────────
+  // IMPORTANTE: se verifica r.ok — si Supabase falla (ej. tabla inexistente),
+  // NO se debe mostrar "Guardado" como si todo estuviera bien, porque en ese
+  // caso los datos solo quedan en este navegador y no se sincronizan entre PCs.
   const persist = useCallback((data: Record<string, MonthData>, extra: string[]) => {
     saveEditsLocal(data)
     saveExtraLocal(extra)
@@ -525,10 +529,15 @@ export function AvanceSemanalModule() {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ edits: data, extraMonths: extra }),
-      }).then(() => {
-        setSavedTag(true)
-        setTimeout(() => setSavedTag(false), 1500)
-      }).catch(() => {})
+      }).then(r => {
+        if (r.ok) {
+          setSaveError(false)
+          setSavedTag(true)
+          setTimeout(() => setSavedTag(false), 1500)
+        } else {
+          setSaveError(true)
+        }
+      }).catch(() => setSaveError(true))
     }, 700)
   }, [])
 
@@ -571,6 +580,11 @@ export function AvanceSemanalModule() {
           </div>
           {savedTag && (
             <span style={{ fontSize: 11, color: '#16A34A', fontWeight: 600 }}>✓ Guardado</span>
+          )}
+          {saveError && (
+            <span style={{ fontSize: 11, color: '#DC2626', fontWeight: 700, background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 6, padding: '3px 9px' }}>
+              ⚠ No se pudo guardar en la nube — los cambios quedaron solo en este navegador
+            </span>
           )}
         </div>
 

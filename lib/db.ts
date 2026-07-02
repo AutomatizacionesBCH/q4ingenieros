@@ -436,13 +436,23 @@ export interface ControlEditsData {
   extraMonths: string[]
 }
 
+// Nota: .maybeSingle() devuelve data=null Y error=null cuando la fila
+// "singleton" simplemente no existe todavía (primer uso, estado esperado).
+// Si en cambio la TABLA no existe (falta la migración SQL), Supabase
+// devuelve error!=null — eso debe propagarse como excepción, nunca
+// tratarse como "sin datos", o el caller cree que guardó cuando en
+// realidad la escritura se perdió en silencio (bug real detectado en
+// reporte_avance_edits: la tabla nunca se creó, cada PC quedó con su
+// propia copia en localStorage sin sincronizar entre sí).
+
 export async function getControlEdits(): Promise<ControlEditsData> {
   const supabase = getSupabase()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('control_edits')
     .select('edits, extra_months')
     .eq('id', 'singleton')
     .maybeSingle()
+  if (error) throw new Error(`[control_edits] ${error.message}`)
   if (!data) return { edits: {}, extraMonths: [] }
   return {
     edits:       (data.edits        ?? {}) as Record<string, unknown>,
@@ -456,23 +466,25 @@ export async function saveControlEdits(
   extraMonths: string[],
 ): Promise<void> {
   const supabase = getSupabase()
-  await supabase
+  const { error } = await supabase
     .from('control_edits')
     .upsert(
       { id: 'singleton', edits, extra_months: extraMonths, updated_at: new Date().toISOString() },
       { onConflict: 'id' },
     )
+  if (error) throw new Error(`[control_edits] ${error.message}`)
 }
 
 // ─── Egreso Mensual edits ─────────────────────────────────────────────────────
 
 export async function getEgresoEdits(): Promise<ControlEditsData> {
   const supabase = getSupabase()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('egreso_edits')
     .select('edits, extra_months')
     .eq('id', 'singleton')
     .maybeSingle()
+  if (error) throw new Error(`[egreso_edits] ${error.message}`)
   if (!data) return { edits: {}, extraMonths: [] }
   return {
     edits:       (data.edits        ?? {}) as Record<string, unknown>,
@@ -486,23 +498,25 @@ export async function saveEgresoEdits(
   extraMonths: string[],
 ): Promise<void> {
   const supabase = getSupabase()
-  await supabase
+  const { error } = await supabase
     .from('egreso_edits')
     .upsert(
       { id: 'singleton', edits, extra_months: extraMonths, updated_at: new Date().toISOString() },
       { onConflict: 'id' },
     )
+  if (error) throw new Error(`[egreso_edits] ${error.message}`)
 }
 
 // ─── Reportería — Avance Semanal Proyectos ───────────────────────────────────
 
 export async function getReporteAvanceEdits(): Promise<ControlEditsData> {
   const supabase = getSupabase()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('reporte_avance_edits')
     .select('edits, extra_months')
     .eq('id', 'singleton')
     .maybeSingle()
+  if (error) throw new Error(`[reporte_avance_edits] ${error.message}`)
   if (!data) return { edits: {}, extraMonths: [] }
   return {
     edits:       (data.edits        ?? {}) as Record<string, unknown>,
@@ -516,12 +530,13 @@ export async function saveReporteAvanceEdits(
   extraMonths: string[],
 ): Promise<void> {
   const supabase = getSupabase()
-  await supabase
+  const { error } = await supabase
     .from('reporte_avance_edits')
     .upsert(
       { id: 'singleton', edits, extra_months: extraMonths, updated_at: new Date().toISOString() },
       { onConflict: 'id' },
     )
+  if (error) throw new Error(`[reporte_avance_edits] ${error.message}`)
 }
 
 // ─── Seed functions ───────────────────────────────────────────────────────────

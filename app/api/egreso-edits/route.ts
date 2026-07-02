@@ -7,7 +7,8 @@ export async function GET() {
   try {
     const data = await getEgresoEdits()
     return NextResponse.json(data)
-  } catch {
+  } catch (e) {
+    console.error('[api/egreso-edits GET]', e)
     return NextResponse.json({ edits: {}, extraMonths: [] }, { status: 200 })
   }
 }
