@@ -473,6 +473,10 @@ export function AvanceSemanalModule() {
   const [saveError,    setSaveError]  = useState(false)
   const [printingMonth, setPrintingMonth] = useState<string | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Se pone en true en cuanto el usuario guarda algo. Evita que el fetch de
+  // hidratación inicial (que puede resolver tarde) pise con datos viejos de
+  // Supabase un guardado que ya ocurrió.
+  const hasLocalEditRef = useRef(false)
 
   // ── Export a single month as PDF via the browser's print dialog ───────────
   useEffect(() => {
@@ -498,6 +502,7 @@ export function AvanceSemanalModule() {
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!data) return
+        if (hasLocalEditRef.current) return // ya se guardó algo más nuevo, no pisarlo
         if (Object.keys(data.edits).length > 0 || data.extraMonths.length > 0) {
           const migrated = migrateLabels(data.edits)
           setAllData(migrated)
@@ -521,6 +526,7 @@ export function AvanceSemanalModule() {
   // NO se debe mostrar "Guardado" como si todo estuviera bien, porque en ese
   // caso los datos solo quedan en este navegador y no se sincronizan entre PCs.
   const persist = useCallback((data: Record<string, MonthData>, extra: string[]) => {
+    hasLocalEditRef.current = true
     saveEditsLocal(data)
     saveExtraLocal(extra)
     if (saveTimer.current) clearTimeout(saveTimer.current)

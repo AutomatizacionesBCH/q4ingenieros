@@ -40,8 +40,12 @@ function fmtCLP(v: number | null | undefined): string {
   }).format(v)
 }
 
+// Formato chileno: '.' es separador de miles, ',' es separador decimal.
+// Hay que quitar los puntos ANTES de convertir la coma, o "120.000.000" se
+// trunca a 120 (parseFloat corta al segundo punto). Mismo patrón ya usado
+// en ProyectosModule.tsx para los inputs de dinero.
 function parseNum(s: string): number | null {
-  const n = parseFloat(s.replace(/[^0-9.,]/g, '').replace(',', '.'))
+  const n = parseFloat(s.replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, ''))
   return isNaN(n) ? null : n
 }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
 // ─── Tokens ───────────────────────────────────────────────────────────────────
@@ -54,8 +54,12 @@ function fmtCLP(v: number | null | undefined): string {
   return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(v)
 }
 
+// Formato chileno: '.' es separador de miles, ',' es separador decimal.
+// Hay que quitar los puntos ANTES de convertir la coma, o "120.000.000" se
+// trunca a 120 (parseFloat corta al segundo punto). Mismo patrón ya usado
+// en ProyectosModule.tsx para los inputs de dinero.
 function parseNum(s: string): number | null {
-  const n = parseFloat(s.replace(/[^0-9.,]/g, '').replace(',', '.'))
+  const n = parseFloat(s.replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, ''))
   return isNaN(n) ? null : n
 }
 
@@ -331,6 +335,11 @@ export function EgresoMensualModule() {
   const [allEdits,    setAllEdits]    = useState<Record<string, MonthEdits>>({})
   const [extraMonths, setExtraMonths] = useState<string[]>([])
   const [saveError,   setSaveError]   = useState(false)
+  // Se pone en true en cuanto el usuario guarda algo. Evita que el fetch de
+  // hidratación inicial (que puede resolver tarde) pise con datos viejos de
+  // Supabase un guardado que ya ocurrió — bug real: el cliente escribía un
+  // egreso, guardaba, y esa respuesta tardía lo hacía desaparecer.
+  const hasLocalEditRef = useRef(false)
 
   // ── Load: Supabase primero, localStorage fallback ─────────────────────────
   useEffect(() => {
@@ -340,6 +349,7 @@ export function EgresoMensualModule() {
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!data) return
+        if (hasLocalEditRef.current) return // ya se guardó algo más nuevo, no pisarlo
         if (Object.keys(data.edits).length > 0 || data.extraMonths.length > 0) {
           setAllEdits(data.edits)
           setExtraMonths(data.extraMonths)
@@ -354,6 +364,7 @@ export function EgresoMensualModule() {
   // Se verifica r.ok — si Supabase falla (ej. tabla inexistente) no se debe
   // asumir que quedó sincronizado; solo vive en este navegador y hay que avisar.
   const persistAll = useCallback((edits: Record<string, MonthEdits>, extra: string[]) => {
+    hasLocalEditRef.current = true
     saveEditsLocal(edits)
     saveExtraLocal(extra)
     fetch('/api/egreso-edits', {
