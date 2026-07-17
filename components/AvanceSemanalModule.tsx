@@ -66,8 +66,7 @@ const DEFAULT_COLUMNS: Column[] = [
   { id: uid(), label: 'N° Proyecto' },
   { id: uid(), label: 'Nombre' },
   { id: uid(), label: 'Responsable' },
-  { id: uid(), label: 'Estado' },
-  { id: uid(), label: 'Semáforo', type: 'semaforo' },
+  { id: uid(), label: 'Estado', type: 'semaforo' },
   { id: uid(), label: 'Próximo Hito' },
 ]
 
@@ -93,9 +92,14 @@ function normalizeLabel(s: string): string {
   return s.trim().toLowerCase().normalize('NFD').replace(COMBINING_DIACRITICS, '')
 }
 
-// Renombra la columna "Proyectista" (nombre antiguo) a "Responsable", y agrega
-// las columnas Semáforo/Próximo Hito a semanas creadas antes de que existieran
-// — en datos ya guardados, sin tocar nada más.
+// Migraciones sobre datos ya guardados (localStorage / Supabase), en orden:
+// 1. Renombra "Proyectista" (nombre antiguo) a "Responsable".
+// 2. Agrega la columna Próximo Hito si no existe.
+// 3. Asegura que exista una columna tipo semáforo (si nunca existió, se crea
+//    directo con el nombre "Estado"); si ya existía con otro label, se
+//    renombra a "Estado".
+// 4. Elimina cualquier columna de TEXTO vieja que también se llamara "Estado"
+//    (la columna semáforo pasa a ocupar ese rol).
 function migrateLabels(data: Record<string, MonthData>): Record<string, MonthData> {
   let changed = false
   const next: Record<string, MonthData> = {}
@@ -107,15 +111,34 @@ function migrateLabels(data: Record<string, MonthData>): Record<string, MonthDat
       })
       let rows = w.rows
 
-      const addMissingColumn = (label: string, type?: Column['type']) => {
-        if (columns.some(c => normalizeLabel(c.label) === normalizeLabel(label))) return
-        const col: Column = { id: uid(), label, type }
+      if (!columns.some(c => normalizeLabel(c.label) === normalizeLabel('Próximo Hito'))) {
+        const col: Column = { id: uid(), label: 'Próximo Hito' }
         columns = [...columns, col]
         rows = rows.map(r => ({ ...r, values: { ...r.values, [col.id]: '' } }))
         changed = true
       }
-      addMissingColumn('Semáforo', 'semaforo')
-      addMissingColumn('Próximo Hito')
+
+      const semaforoCol = columns.find(c => c.type === 'semaforo')
+      if (!semaforoCol) {
+        const col: Column = { id: uid(), label: 'Estado', type: 'semaforo' }
+        columns = [...columns, col]
+        rows = rows.map(r => ({ ...r, values: { ...r.values, [col.id]: '' } }))
+        changed = true
+      } else if (normalizeLabel(semaforoCol.label) !== 'estado') {
+        columns = columns.map(c => c.id === semaforoCol.id ? { ...c, label: 'Estado' } : c)
+        changed = true
+      }
+
+      const oldEstadoCol = columns.find(c => c.type !== 'semaforo' && normalizeLabel(c.label) === 'estado')
+      if (oldEstadoCol) {
+        columns = columns.filter(c => c.id !== oldEstadoCol.id)
+        rows = rows.map(r => {
+          const values = { ...r.values }
+          delete values[oldEstadoCol.id]
+          return { ...r, values }
+        })
+        changed = true
+      }
 
       return { ...w, columns, rows }
     })
