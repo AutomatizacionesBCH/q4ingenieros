@@ -56,8 +56,18 @@ function loadExtra(): string[] {
 function saveExtraLocal(e: string[]) { localStorage.setItem(KEY_EXTRA, JSON.stringify(e)) }
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
-let _seq = 0
-const uid = () => `r${++_seq}`
+// IMPORTANTE: a diferencia de otros módulos (Control/Egreso Mensual), acá los
+// ids de fila/columna/semana SON el dato persistido (se guardan en Supabase
+// y localStorage, no se regeneran al abrir). Un contador que reinicia en cada
+// carga de página (let _seq = 0) genera los MISMOS ids en cada sesión nueva
+// (ej. siempre "r6" para la primera fila agregada), colisionando con ids ya
+// guardados de sesiones anteriores — dos filas distintas con el mismo id
+// hacen que escribir en una sobreescriba la otra. Bug real reportado por el
+// cliente. crypto.randomUUID() no depende de ningún contador de sesión.
+function uid(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  return `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
 
 const ALL_MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -92,6 +102,43 @@ function normalizeLabel(s: string): string {
   return s.trim().toLowerCase().normalize('NFD').replace(COMBINING_DIACRITICS, '')
 }
 
+// Repara filas/columnas que hayan quedado con el mismo id (bug real: el
+// generador de ids anterior se reiniciaba en cada carga de página, así que
+// dos filas creadas en sesiones distintas podían terminar con el mismo id —
+// y como updateCell() actualiza TODAS las filas que calzan con ese id,
+// escribir en una fila también pisaba silenciosamente la otra). Reasigna un
+// id nuevo a cada duplicado sin perder ningún dato; si una columna duplicada
+// se separa, copia su valor actual a la columna nueva.
+function dedupeWeek(week: Week): { week: Week; changed: boolean } {
+  let changed = false
+
+  const seenCols = new Set<string>()
+  let rows = week.rows
+  const columns = week.columns.map(c => {
+    if (seenCols.has(c.id)) {
+      changed = true
+      const oldId = c.id
+      const newId = uid()
+      rows = rows.map(r => ({ ...r, values: { ...r.values, [newId]: r.values[oldId] ?? '' } }))
+      return { ...c, id: newId }
+    }
+    seenCols.add(c.id)
+    return c
+  })
+
+  const seenRows = new Set<string>()
+  rows = rows.map(r => {
+    if (seenRows.has(r.id)) {
+      changed = true
+      return { ...r, id: uid() }
+    }
+    seenRows.add(r.id)
+    return r
+  })
+
+  return { week: changed ? { ...week, columns, rows } : week, changed }
+}
+
 // Migraciones sobre datos ya guardados (localStorage / Supabase), en orden:
 // 1. Renombra "Proyectista" (nombre antiguo) a "Responsable".
 // 2. Agrega la columna Próximo Hito si no existe.
@@ -100,10 +147,12 @@ function normalizeLabel(s: string): string {
 //    renombra a "Estado".
 // 4. Elimina cualquier columna de TEXTO vieja que también se llamara "Estado"
 //    (la columna semáforo pasa a ocupar ese rol).
+// 5. Repara filas/columnas duplicadas (dedupeWeek, ver arriba).
 function migrateLabels(data: Record<string, MonthData>): Record<string, MonthData> {
   let changed = false
   const next: Record<string, MonthData> = {}
   for (const [mes, month] of Object.entries(data)) {
+    let seenWeekIds = new Set<string>()
     const weeks = (month.weeks ?? []).map(w => {
       let columns = w.columns.map(c => {
         if (normalizeLabel(c.label) === 'proyectista') { changed = true; return { ...c, label: 'Responsable' } }
@@ -140,7 +189,18 @@ function migrateLabels(data: Record<string, MonthData>): Record<string, MonthDat
         changed = true
       }
 
-      return { ...w, columns, rows }
+      let week: Week = { ...w, columns, rows }
+      const deduped = dedupeWeek(week)
+      week = deduped.week
+      if (deduped.changed) changed = true
+
+      if (seenWeekIds.has(week.id)) {
+        week = { ...week, id: uid() }
+        changed = true
+      }
+      seenWeekIds.add(week.id)
+
+      return week
     })
     next[mes] = { ...month, weeks }
   }
