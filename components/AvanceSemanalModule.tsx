@@ -23,10 +23,24 @@ const C = {
 } as const
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface Column { id: string; label: string }
+interface Column { id: string; label: string; type?: 'text' | 'semaforo' }
 interface Row     { id: string; values: Record<string, string> }
 interface Week    { id: string; label: string; columns: Column[]; rows: Row[]; locked?: boolean }
 interface MonthData { weeks: Week[] }
+
+// ─── Semáforo (traffic light status) ─────────────────────────────────────────
+type SemaforoKey = 'verde' | 'amarillo' | 'rojo' | 'azul'
+
+const SEMAFORO_OPTIONS: { key: SemaforoKey; color: string; label: string }[] = [
+  { key: 'verde',    color: '#22C55E', label: 'En plazo' },
+  { key: 'amarillo', color: '#EAB308', label: 'En riesgo' },
+  { key: 'rojo',     color: '#EF4444', label: 'Atrasado / crítico' },
+  { key: 'azul',     color: '#3B82F6', label: 'Completado / Sin iniciar' },
+]
+
+function semaforoInfo(value: string) {
+  return SEMAFORO_OPTIONS.find(o => o.key === value) ?? null
+}
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 const KEY_EDITS = 'reporte_avance_edits_v1'
@@ -53,6 +67,8 @@ const DEFAULT_COLUMNS: Column[] = [
   { id: uid(), label: 'Nombre' },
   { id: uid(), label: 'Responsable' },
   { id: uid(), label: 'Estado' },
+  { id: uid(), label: 'Semáforo', type: 'semaforo' },
+  { id: uid(), label: 'Próximo Hito' },
 ]
 
 function emptyRow(columns: Column[]): Row {
@@ -62,7 +78,7 @@ function emptyRow(columns: Column[]): Row {
 }
 
 function newWeek(label: string): Week {
-  const columns = DEFAULT_COLUMNS.map(c => ({ id: uid(), label: c.label }))
+  const columns = DEFAULT_COLUMNS.map(c => ({ id: uid(), label: c.label, type: c.type }))
   const rows = Array.from({ length: 6 }, () => emptyRow(columns))
   return { id: uid(), label, columns, rows, locked: false }
 }
@@ -71,17 +87,37 @@ function nonEmptyRows(week: Week): Row[] {
   return week.rows.filter(r => week.columns.some(c => (r.values[c.id] ?? '').trim() !== ''))
 }
 
-// Renombra la columna "Proyectista" (nombre antiguo) a "Responsable" en datos ya guardados
+const COMBINING_DIACRITICS = new RegExp('[̀-ͯ]', 'g')
+
+function normalizeLabel(s: string): string {
+  return s.trim().toLowerCase().normalize('NFD').replace(COMBINING_DIACRITICS, '')
+}
+
+// Renombra la columna "Proyectista" (nombre antiguo) a "Responsable", y agrega
+// las columnas Semáforo/Próximo Hito a semanas creadas antes de que existieran
+// — en datos ya guardados, sin tocar nada más.
 function migrateLabels(data: Record<string, MonthData>): Record<string, MonthData> {
   let changed = false
   const next: Record<string, MonthData> = {}
   for (const [mes, month] of Object.entries(data)) {
     const weeks = (month.weeks ?? []).map(w => {
-      const columns = w.columns.map(c => {
-        if (c.label.trim().toLowerCase() === 'proyectista') { changed = true; return { ...c, label: 'Responsable' } }
+      let columns = w.columns.map(c => {
+        if (normalizeLabel(c.label) === 'proyectista') { changed = true; return { ...c, label: 'Responsable' } }
         return c
       })
-      return { ...w, columns }
+      let rows = w.rows
+
+      const addMissingColumn = (label: string, type?: Column['type']) => {
+        if (columns.some(c => normalizeLabel(c.label) === normalizeLabel(label))) return
+        const col: Column = { id: uid(), label, type }
+        columns = [...columns, col]
+        rows = rows.map(r => ({ ...r, values: { ...r.values, [col.id]: '' } }))
+        changed = true
+      }
+      addMissingColumn('Semáforo', 'semaforo')
+      addMissingColumn('Próximo Hito')
+
+      return { ...w, columns, rows }
     })
     next[mes] = { ...month, weeks }
   }
@@ -94,13 +130,31 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
+// Texto plano de una celda — el semáforo se exporta como su etiqueta ("En plazo"),
+// nunca como la clave interna ("verde").
+function cellText(col: Column, rawValue: string): string {
+  if (col.type === 'semaforo') return semaforoInfo(rawValue)?.label ?? ''
+  return rawValue
+}
+
+// HTML de una celda — el semáforo se exporta como un punto de color + etiqueta,
+// usando estilos inline (los clientes de correo ignoran <style>).
+function cellHtml(col: Column, rawValue: string): string {
+  if (col.type === 'semaforo') {
+    const info = semaforoInfo(rawValue)
+    if (!info) return '—'
+    return `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${info.color};margin-right:6px;"></span>${escapeHtml(info.label)}`
+  }
+  return escapeHtml(rawValue)
+}
+
 function buildWeekHtml(mes: string, week: Week): string {
   const rows = nonEmptyRows(week)
   const thStyle = 'background:#2563EB;color:#ffffff;padding:8px 10px;text-align:left;border:1px solid #1D4ED8;font-family:Arial,sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;'
   const tdStyle = 'padding:8px 10px;border:1px solid #E2E8F0;font-family:Arial,sans-serif;font-size:13px;color:#0F1A2E;'
   const header = `<tr>${week.columns.map(c => `<th style="${thStyle}">${escapeHtml(c.label || '—')}</th>`).join('')}</tr>`
   const body = rows.map((r, i) =>
-    `<tr>${week.columns.map(c => `<td style="${tdStyle}background:${i % 2 === 0 ? '#ffffff' : '#FAFBFD'};">${escapeHtml(r.values[c.id] ?? '')}</td>`).join('')}</tr>`
+    `<tr>${week.columns.map(c => `<td style="${tdStyle}background:${i % 2 === 0 ? '#ffffff' : '#FAFBFD'};">${cellHtml(c, r.values[c.id] ?? '')}</td>`).join('')}</tr>`
   ).join('')
   const title = `<div style="font-family:Arial,sans-serif;font-size:13px;font-weight:700;color:#0F1A2E;margin-bottom:8px;">Semana ${escapeHtml(week.label || '—')} — ${escapeHtml(mes)}</div>`
   return `${title}<table style="border-collapse:collapse;">${header}${body}</table>`
@@ -109,7 +163,7 @@ function buildWeekHtml(mes: string, week: Week): string {
 function buildWeekText(week: Week): string {
   const rows = nonEmptyRows(week)
   const header = week.columns.map(c => c.label).join('\t')
-  const body = rows.map(r => week.columns.map(c => r.values[c.id] ?? '').join('\t')).join('\n')
+  const body = rows.map(r => week.columns.map(c => cellText(c, r.values[c.id] ?? '')).join('\t')).join('\n')
   return [header, body].filter(Boolean).join('\n')
 }
 
@@ -153,6 +207,44 @@ function ReadCell({ value }: { value: string }) {
   return (
     <div style={{ padding: '8px 10px', fontSize: 13, color: value ? C.text : C.textMt }}>
       {value || '—'}
+    </div>
+  )
+}
+
+// ─── Semáforo cell ────────────────────────────────────────────────────────────
+
+function SemaforoCell({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, padding: '8px 10px', alignItems: 'center' }}>
+      {SEMAFORO_OPTIONS.map(opt => {
+        const active = value === opt.key
+        return (
+          <button
+            key={opt.key}
+            type="button"
+            title={opt.label}
+            onClick={() => onChange(active ? '' : opt.key)}
+            style={{
+              width: 16, height: 16, borderRadius: '50%', flexShrink: 0, padding: 0, cursor: 'pointer',
+              background: opt.color,
+              border: active ? '2px solid #0F1A2E' : '1px solid rgba(0,0,0,0.12)',
+              boxShadow: active ? '0 0 0 2px rgba(15,26,46,0.12)' : 'none',
+              opacity: active ? 1 : 0.35,
+            }}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+function SemaforoReadCell({ value }: { value: string }) {
+  const info = semaforoInfo(value)
+  if (!info) return <div style={{ padding: '8px 10px', fontSize: 13, color: C.textMt }}>—</div>
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px' }}>
+      <span style={{ width: 11, height: 11, borderRadius: '50%', background: info.color, display: 'inline-block', flexShrink: 0 }} />
+      <span style={{ fontSize: 12, color: C.text }}>{info.label}</span>
     </div>
   )
 }
@@ -293,9 +385,15 @@ function WeekBlock({ mes, week, onChange, onDelete }: {
               <tr key={row.id} style={{ background: i % 2 === 0 ? C.card : '#FAFBFD' }}>
                 {week.columns.map(col => (
                   <td key={col.id} style={{ borderBottom: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}` }}>
-                    {locked
-                      ? <ReadCell value={row.values[col.id] ?? ''} />
-                      : <Cell value={row.values[col.id] ?? ''} onChange={v => updateCell(row.id, col.id, v)} />}
+                    {col.type === 'semaforo' ? (
+                      locked
+                        ? <SemaforoReadCell value={row.values[col.id] ?? ''} />
+                        : <SemaforoCell value={row.values[col.id] ?? ''} onChange={v => updateCell(row.id, col.id, v)} />
+                    ) : (
+                      locked
+                        ? <ReadCell value={row.values[col.id] ?? ''} />
+                        : <Cell value={row.values[col.id] ?? ''} onChange={v => updateCell(row.id, col.id, v)} />
+                    )}
                   </td>
                 ))}
                 {!locked && (
@@ -406,11 +504,27 @@ function PrintableMonth({ mes, data }: { mes: string; data: MonthData }) {
             <tbody>
               {w.rows.map((r, i) => (
                 <tr key={r.id} style={{ background: i % 2 === 0 ? '#fff' : '#FAFBFD' }}>
-                  {w.columns.map(c => (
-                    <td key={c.id} style={{ padding: '8px 10px', border: `1px solid ${C.border}`, fontSize: 12 }}>
-                      {r.values[c.id] ?? ''}
-                    </td>
-                  ))}
+                  {w.columns.map(c => {
+                    const raw = r.values[c.id] ?? ''
+                    if (c.type === 'semaforo') {
+                      const info = semaforoInfo(raw)
+                      return (
+                        <td key={c.id} style={{ padding: '8px 10px', border: `1px solid ${C.border}`, fontSize: 12 }}>
+                          {info ? (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ width: 9, height: 9, borderRadius: '50%', background: info.color, display: 'inline-block', flexShrink: 0 }} />
+                              {info.label}
+                            </span>
+                          ) : '—'}
+                        </td>
+                      )
+                    }
+                    return (
+                      <td key={c.id} style={{ padding: '8px 10px', border: `1px solid ${C.border}`, fontSize: 12 }}>
+                        {raw}
+                      </td>
+                    )
+                  })}
                 </tr>
               ))}
             </tbody>
