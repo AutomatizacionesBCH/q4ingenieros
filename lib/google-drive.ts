@@ -59,6 +59,11 @@ export async function listDrivePDFs(folderId: string): Promise<DriveFile[]> {
       fields:     'nextPageToken, files(id, name)',
       pageSize:   1000,
       pageToken,
+      // Sin esto, archivos que viven en una Unidad Compartida (Shared Drive)
+      // de Google Workspace no aparecen en absoluto — la API los omite en
+      // silencio, sin error. No afecta a carpetas normales de "Mi unidad".
+      supportsAllDrives:        true,
+      includeItemsFromAllDrives: true,
     })
     for (const f of res.data.files ?? []) {
       if (f.id && f.name) files.push({ id: f.id, name: f.name })
@@ -73,7 +78,7 @@ export async function listDrivePDFs(folderId: string): Promise<DriveFile[]> {
 export async function getDriveFileBuffer(fileId: string): Promise<Buffer> {
   const drive = getDrive()
   const res   = await drive.files.get(
-    { fileId, alt: 'media' },
+    { fileId, alt: 'media', supportsAllDrives: true },
     { responseType: 'arraybuffer' },
   )
   return Buffer.from(res.data as ArrayBuffer)
